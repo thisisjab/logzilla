@@ -17,20 +17,12 @@ func (l LogLevel) String() string {
 	return [...]string{"DEBUG", "INFO", "WARN", "ERROR", "FATAL"}[l]
 }
 
-// RawLogRecord represents a log record that is not processed and received from a log source.
-type RawLogRecord struct {
-	Source string `json:"source"`
-	Data   []byte `json:"data"`
-	// The reason `Level` and `Timestamp` are present here is that in processors can use these values as fallbacks.
-	Level     LogLevel  `json:"level"`
-	Timestamp time.Time `json:"timestamp"`
-}
-
-// ProcessedLogRecord represents a log record that has been processed by a processor.
-type ProcessedLogRecord struct {
+// LogRecord represents a log record that is not processed and received from a log source.
+type LogRecord struct {
 	Source    string         `json:"source"`
-	Message   string         `json:"message"`
+	RawData   []byte         `json:"raw_data"`
 	Level     LogLevel       `json:"level"`
 	Timestamp time.Time      `json:"timestamp"`
+	Message   string         `json:"message"`
 	Metadata  map[string]any `json:"metadata"`
 }

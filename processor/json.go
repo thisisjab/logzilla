@@ -27,24 +27,24 @@ func NewJsonLogProcessor(logLevelFieldName, logMessageFieldName, logTimestampFie
 }
 
 // Process parses a JSON log record and extracts log level, message, and timestamp, and metadata.
-func (p *JsonLogProcessor) Process(record entity.RawLogRecord) (entity.ProcessedLogRecord, error) {
+func (p *JsonLogProcessor) Process(record entity.LogRecord) (entity.LogRecord, error) {
 	data := make(map[string]any)
 
-	err := json.Unmarshal(record.Data, &data)
+	err := json.Unmarshal(record.RawData, &data)
 	if err != nil {
-		return entity.ProcessedLogRecord{}, err
+		return entity.LogRecord{}, err
 	}
 
 	// Parsing time
 	val, ok := data[p.logTimestampFieldName]
 	timestampValue, isString := val.(string)
 	if !ok || !isString || timestampValue == "" {
-		return entity.ProcessedLogRecord{}, errors.New("timestamp field is missing or not a string")
+		return entity.LogRecord{}, errors.New("timestamp field is missing or not a string")
 	}
 
 	timestamp, err := time.Parse(time.RFC3339, timestampValue)
 	if err != nil {
-		return entity.ProcessedLogRecord{}, fmt.Errorf("cannot parse timestamp: %w", err)
+		return entity.LogRecord{}, fmt.Errorf("cannot parse timestamp: %w", err)
 	}
 	delete(data, p.logTimestampFieldName)
 
@@ -52,7 +52,7 @@ func (p *JsonLogProcessor) Process(record entity.RawLogRecord) (entity.Processed
 	val, ok = data[p.logLevelFieldName]
 	levelValue, isString := val.(string)
 	if !ok || !isString {
-		return entity.ProcessedLogRecord{}, errors.New("level field is missing or not a string")
+		return entity.LogRecord{}, errors.New("level field is missing or not a string")
 	}
 	level := parseLevel(levelValue)
 	delete(data, p.logLevelFieldName)
@@ -62,7 +62,7 @@ func (p *JsonLogProcessor) Process(record entity.RawLogRecord) (entity.Processed
 	messageValue, _ := val.(string)
 	delete(data, p.logMessageFieldName)
 
-	return entity.ProcessedLogRecord{
+	return entity.LogRecord{
 		Level:     level,
 		Message:   messageValue,
 		Timestamp: timestamp,
