@@ -5,92 +5,74 @@ import (
 	"errors"
 	"log/slog"
 	"sync"
+	"time"
 
 	"github.com/thisisjab/logzilla/entity"
 )
 
-const WorkersCount = 10
-
-// LogSource is an interface that defines the contract for log sources.
-type LogSource interface {
-	Provide(ctx context.Context, logChan chan<- entity.LogRecord) error
-	ProcessorNames() []string
-	SourceName() string
-}
-
-// LogProcessor is an interface that defines the contract for log processors.
-type LogProcessor interface {
-	Process(logRecord entity.LogRecord) (entity.LogRecord, error)
-}
-
 type Config struct {
-	Sources    map[string]LogSource
-	Processors map[string]LogProcessor
+	Sources              map[string]LogSource
+	Processors           map[string]LogProcessor
+	Storage              Storage
+	StorageFlushInterval time.Duration
+	BufferMaxSize        uint
 }
 
 type Engine struct {
-	cfg    Config
-	logger *slog.Logger
+	cfg            Config
+	logger         *slog.Logger
+	storageManager *storageManager
 }
 
-func New(cfg Config, logger *slog.Logger) *Engine {
-	return &Engine{cfg: cfg, logger: logger}
+func New(cfg Config, logger *slog.Logger) (*Engine, error) {
+	if err := cfg.validate(); err != nil {
+		return nil, err
+	}
+
+	return &Engine{cfg: cfg, logger: logger, storageManager: newStorageManager(logger, cfg.Storage, cfg.BufferMaxSize, cfg.StorageFlushInterval)}, nil
 }
 
-func (e *Engine) ValidateConfig() error {
-	if len(e.cfg.Sources) == 0 {
-		return errors.New("no log sources configured")
+func (c Config) validate() error {
+	if len(c.Sources) == 0 {
+		return errors.New("no log sources are configured")
+	}
+
+	// TODO: validate used processors do exists (defined in configuration)
+
+	if c.Storage == nil {
+		return errors.New("no log storage is configured")
+	}
+
+	if c.BufferMaxSize == 0 && c.StorageFlushInterval == 0 {
+		return errors.New("buffer max size and storage flush interval cannot both be zero")
 	}
 
 	return nil
 }
 
 func (e *Engine) Run(ctx context.Context) error {
-	if err := e.ValidateConfig(); err != nil {
-		return err
-	}
-
-	// 1. Start consuming logs from all sources.
-	// This returns a channel that acts as the load balancer queue.
+	// Start consuming logs from all sources.
 	rawLogs := e.consumeLogs(ctx)
 
-	// 2. Create a channel for processed results.
-	// Buffer size 100 is fine, but you might tune this based on throughput.
-	results := make(chan entity.LogRecord, 100)
+	var wg sync.WaitGroup
+	processedLogs := make(chan entity.LogRecord, 1000)
 
-	// 3. Use a WaitGroup to wait for all workers to finish processing.
-	var workersWg sync.WaitGroup
+	pm := newProcessorManager(e.logger, e.cfg.Sources, e.cfg.Processors, WorkersCount, 10*time.Second)
 
-	// 4. Start the 10 workers.
-	for i := range WorkersCount {
-		workersWg.Go(func() {
-			e.logger.Debug("Started processor worker.", "id", i+1)
-			e.processorWorker(ctx, rawLogs, results)
-		})
-	}
+	wg.Go(func() { e.storageManager.run(ctx) })
+	wg.Go(func() { pm.run(ctx, rawLogs, processedLogs) })
 
-	// 5. Wait for all workers to finish in a separate goroutine.
-	// Once done, close the results channel to signal the main loop that work is complete.
-	go func() {
-		workersWg.Wait()
-		e.logger.Debug("Closing results channel.")
-		close(results)
-	}()
-
-	// 6. Main blocking loop: Read from results until the channel is closed.
 	for {
 		select {
 		case <-ctx.Done():
 			// Context cancelled (e.g., user hit Ctrl+C)
+			wg.Wait()
 			return ctx.Err()
-		case res, ok := <-results:
+		case p, ok := <-processedLogs:
 			if !ok {
-				// Channel closed and drained, meaning all workers are done.
 				return nil
 			}
-			// Handle the processed log
-			// TODO: implement storage
-			e.logger.Info("New processed log.", "message", res.Message)
+			e.storageManager.addProcessedLogs(ctx, p)
 		}
 	}
 }
@@ -110,7 +92,7 @@ func (e *Engine) consumeLogs(ctx context.Context) <-chan entity.LogRecord {
 			err := src.Provide(ctx, rawLogs)
 
 			if err != nil {
-				e.logger.Error("Failed to start log source.", "name", name, "error", err)
+				e.logger.Error("failed to start log source.", "name", name, "error", err)
 			}
 		}(n, s)
 	}
@@ -121,53 +103,4 @@ func (e *Engine) consumeLogs(ctx context.Context) <-chan entity.LogRecord {
 	}()
 
 	return rawLogs
-}
-
-func (e *Engine) processLog(rawLog entity.LogRecord) entity.LogRecord {
-	src, ok := e.cfg.Sources[rawLog.Source]
-	if !ok {
-		e.logger.Error("Source not found", "source", rawLog.Source)
-		return rawLog
-	}
-
-	for _, pName := range src.ProcessorNames() {
-		p := e.cfg.Processors[pName]
-		if p == nil {
-			e.logger.Warn("Processor not found", "processor", pName)
-			continue
-		}
-
-		processedLog, err := p.Process(rawLog)
-		if err != nil {
-			e.logger.Error("Failed to process log", "error", err)
-			continue
-		}
-
-		rawLog = processedLog
-	}
-
-	return rawLog
-}
-
-func (e *Engine) processorWorker(ctx context.Context, jobs <-chan entity.LogRecord, results chan<- entity.LogRecord) {
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case j, ok := <-jobs:
-			if !ok {
-				// The jobs channel is closed and empty. No more work.
-				return
-			}
-			// Process and send to results
-			processed := e.processLog(j)
-
-			select {
-			case results <- processed:
-			case <-ctx.Done():
-				// If we can't send because context is cancelled, exit.
-				return
-			}
-		}
-	}
 }

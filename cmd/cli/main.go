@@ -10,10 +10,11 @@ import (
 	"github.com/thisisjab/logzilla/engine"
 	"github.com/thisisjab/logzilla/processor"
 	"github.com/thisisjab/logzilla/source"
+	"github.com/thisisjab/logzilla/storage"
 )
 
 func main() {
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug})) // TODO: read this from config
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug})) // TODO: read this from config
 
 	// 1. Create a context that can be cancelled
 	ctx, cancel := context.WithCancel(context.Background())
@@ -25,7 +26,7 @@ func main() {
 	// 3. Run the engine in a separate goroutine so we can wait for signals
 	go func() {
 		sig := <-sigChan
-		logger.Info("Received signal. Shutting down.", "signal", sig)
+		logger.Info("received signal. shutting down.", "signal", sig)
 		cancel()
 	}()
 
@@ -34,18 +35,33 @@ func main() {
 	sources["file"] = source.NewFileLogSource(logger, "file", "/home/jab/Desktop/logs.json", []string{"json"})
 	processors := make(map[string]engine.LogProcessor)
 	processors["json"] = processor.NewJsonLogProcessor("l", "m", "t")
-
-	engine := engine.New(engine.Config{
-		Sources:    sources,
-		Processors: processors,
-	}, logger)
-
-	// 4. Run the engine.
-	err := engine.Run(ctx)
-
+	storage, err := storage.NewClickhouseStorage(storage.ClickhouseStorageConfig{
+		Addr:     []string{"localhost:9000"},
+		Database: "logzilla",
+		Username: "logzilla",
+		Password: "logzilla",
+	})
 	if err != nil {
-		logger.Error("Engine error.", "error", err)
+		logger.Error("storage error.", "error", err)
+		os.Exit(1)
+	}
+	defer storage.Close()
+
+	engine, err := engine.New(engine.Config{
+		Sources:       sources,
+		Processors:    processors,
+		Storage:       storage,
+		BufferMaxSize: 100,
+	}, logger)
+	if err != nil {
+		logger.Error("engine error.", "error", err)
+		os.Exit(1)
 	}
 
-	logger.Info("Engine stopped.")
+	// 4. Run the engine.
+	if err := engine.Run(ctx); err != nil {
+		logger.Error("engine error.", "error", err)
+	}
+
+	logger.Info("engine stopped.")
 }

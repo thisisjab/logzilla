@@ -68,7 +68,7 @@ func (f *FileLogSource) Provide(ctx context.Context, logChan chan<- entity.LogRe
 	for {
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return nil
 
 		case event, ok := <-watcher.Events:
 			if !ok {
@@ -84,7 +84,7 @@ func (f *FileLogSource) Provide(ctx context.Context, logChan chan<- entity.LogRe
 				// start reading from the beginning.
 				// Btw, in normal environment, no one performs such actions and they use linux append to append to file
 				// which preserves the inode.
-				f.logger.Debug("Received unhandled event from fsnotify.", "event", event.String())
+				f.logger.Debug("received unhandled event from fsnotify.", "event", event.String())
 				continue
 			}
 
