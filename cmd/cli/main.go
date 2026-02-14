@@ -43,7 +43,7 @@ func main() {
 	sources["file"] = source.NewFileLogSource(logger, "file", "/home/jab/Desktop/logs.json", []string{"json"})
 	processors := make(map[string]engine.LogProcessor)
 	processors["json"] = processor.NewJsonLogProcessor("l", "m", "t")
-	storage, err := storage.NewClickhouseStorage(storage.ClickhouseStorageConfig{
+	storage, err := storage.NewClickHouseStorage(storage.ClickHouseStorageConfig{
 		Addr:     []string{"localhost:9000"},
 		Database: "logzilla",
 		Username: "logzilla",
@@ -56,12 +56,12 @@ func main() {
 	defer storage.Close()
 
 	engine, err := engine.New(engine.Config{
-		Sources:                      sources,
-		Processors:                   processors,
-		Storage:                      storage,
-		RawLogsBufferMaxSize:         100,
-		ProcessedLogsInBufferMaxSize: 100,
-		ProcessorWorkersCount:        10,
+		Sources:                    sources,
+		Processors:                 processors,
+		Storage:                    storage,
+		RawLogsBufferMaxSize:       100,
+		ProcessedLogsBufferMaxSize: 100,
+		ProcessorWorkersCount:      10,
 	}, logger)
 	if err != nil {
 		logger.Error("engine error.", "error", err)

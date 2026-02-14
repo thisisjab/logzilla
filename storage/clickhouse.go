@@ -11,19 +11,19 @@ import (
 	"github.com/thisisjab/logzilla/entity"
 )
 
-type ClickhouseStorage struct {
+type ClickHouseStorage struct {
 	conn clickhouse.Conn
 }
 
-type ClickhouseStorageConfig struct {
+type ClickHouseStorageConfig struct {
 	Addr     []string `yaml:"addr"`
 	Database string   `yaml:"database"`
 	Username string   `yaml:"username"`
 	Password string   `yaml:"password"`
 }
 
-func NewClickhouseStorage(cfg ClickhouseStorageConfig) (*ClickhouseStorage, error) {
-	// FIXME: implment a wait-for-ready procedure
+func NewClickHouseStorage(cfg ClickHouseStorageConfig) (*ClickHouseStorage, error) {
+	// FIXME: implement a wait-for-ready procedure
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -49,16 +49,16 @@ func NewClickhouseStorage(cfg ClickhouseStorageConfig) (*ClickhouseStorage, erro
 	}
 
 	// Since we only have two tables, for now we don't need to introduce go-migrate
-	if err := setupClickhouseTables(ctx, conn); err != nil {
+	if err := setupClickHouseTables(ctx, conn); err != nil {
 		return nil, fmt.Errorf("failed to create table: %v", err)
 	}
 
-	return &ClickhouseStorage{
+	return &ClickHouseStorage{
 		conn: conn,
 	}, nil
 }
 
-func setupClickhouseTables(ctx context.Context, conn driver.Conn) error {
+func setupClickHouseTables(ctx context.Context, conn driver.Conn) error {
 	// Table 1: Raw Logs
 	// Use String for raw_data to hold bytes; ClickHouse handles bytes as String.
 	err := conn.Exec(ctx, `
@@ -95,11 +95,11 @@ func setupClickhouseTables(ctx context.Context, conn driver.Conn) error {
 	return err
 }
 
-func (s *ClickhouseStorage) Close() error {
+func (s *ClickHouseStorage) Close() error {
 	return s.conn.Close()
 }
 
-func (s *ClickhouseStorage) StoreRawLogs(ctx context.Context, logs ...entity.LogRecord) error {
+func (s *ClickHouseStorage) StoreRawLogs(ctx context.Context, logs ...entity.LogRecord) error {
 	if len(logs) == 0 {
 		return nil
 	}
@@ -128,7 +128,7 @@ func (s *ClickhouseStorage) StoreRawLogs(ctx context.Context, logs ...entity.Log
 	return nil
 }
 
-func (s *ClickhouseStorage) StoreProcessedLogs(ctx context.Context, logs ...entity.LogRecord) error {
+func (s *ClickHouseStorage) StoreProcessedLogs(ctx context.Context, logs ...entity.LogRecord) error {
 	if len(logs) == 0 {
 		return nil
 	}

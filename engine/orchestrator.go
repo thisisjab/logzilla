@@ -11,13 +11,13 @@ import (
 )
 
 type Config struct {
-	Sources                      map[string]LogSource
-	Processors                   map[string]LogProcessor
-	Storage                      Storage
-	StorageFlushInterval         time.Duration
-	RawLogsBufferMaxSize         uint
-	ProcessedLogsInBufferMaxSize uint
-	ProcessorWorkersCount        uint
+	Sources                    map[string]LogSource
+	Processors                 map[string]LogProcessor
+	Storage                    Storage
+	StorageFlushInterval       time.Duration
+	RawLogsBufferMaxSize       uint
+	ProcessedLogsBufferMaxSize uint
+	ProcessorWorkersCount      uint
 }
 
 type Engine struct {
@@ -52,7 +52,7 @@ func (c Config) validate() error {
 		return errors.New("buffer max size and storage flush interval cannot both be zero")
 	}
 
-	if c.ProcessedLogsInBufferMaxSize == 0 {
+	if c.ProcessedLogsBufferMaxSize == 0 {
 		return errors.New("processed logs buffer max size cannot be zero")
 	}
 
@@ -68,7 +68,7 @@ func (e *Engine) Run(ctx context.Context) error {
 	rawLogs := e.consumeLogs(ctx)
 
 	var wg sync.WaitGroup
-	processedLogs := make(chan entity.LogRecord, e.cfg.ProcessedLogsInBufferMaxSize)
+	processedLogs := make(chan entity.LogRecord, e.cfg.ProcessedLogsBufferMaxSize)
 
 	pm := newProcessorManager(e.logger, e.cfg.Sources, e.cfg.Processors, e.cfg.ProcessorWorkersCount, 10*time.Second)
 
