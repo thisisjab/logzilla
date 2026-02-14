@@ -6,7 +6,9 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
+	"github.com/lmittmann/tint"
 	"github.com/thisisjab/logzilla/engine"
 	"github.com/thisisjab/logzilla/processor"
 	"github.com/thisisjab/logzilla/source"
@@ -14,7 +16,13 @@ import (
 )
 
 func main() {
-	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug})) // TODO: read this from config
+	logger := slog.New(
+		tint.NewHandler(os.Stdout, &tint.Options{
+			// TODO: read these values from config
+			Level:      slog.LevelDebug,
+			TimeFormat: time.Kitchen,
+		}),
+	)
 
 	// 1. Create a context that can be cancelled
 	ctx, cancel := context.WithCancel(context.Background())
@@ -48,10 +56,12 @@ func main() {
 	defer storage.Close()
 
 	engine, err := engine.New(engine.Config{
-		Sources:       sources,
-		Processors:    processors,
-		Storage:       storage,
-		BufferMaxSize: 100,
+		Sources:                      sources,
+		Processors:                   processors,
+		Storage:                      storage,
+		RawLogsBufferMaxSize:         100,
+		ProcessedLogsInBufferMaxSize: 100,
+		ProcessorWorkersCount:        10,
 	}, logger)
 	if err != nil {
 		logger.Error("engine error.", "error", err)

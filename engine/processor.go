@@ -15,18 +15,16 @@ type LogProcessor interface {
 	Process(logRecord entity.LogRecord) (entity.LogRecord, error)
 }
 
-const WorkersCount = 10
-
 type processorManager struct {
 	interval     time.Duration
 	sources      map[string]LogSource
 	processors   map[string]LogProcessor
 	logger       *slog.Logger
-	workersCount int
+	workersCount uint
 	wg           sync.WaitGroup
 }
 
-func newProcessorManager(logger *slog.Logger, sources map[string]LogSource, processors map[string]LogProcessor, workersCount int, interval time.Duration) *processorManager {
+func newProcessorManager(logger *slog.Logger, sources map[string]LogSource, processors map[string]LogProcessor, workersCount uint, interval time.Duration) *processorManager {
 	return &processorManager{
 		interval:     interval,
 		sources:      sources,
@@ -63,7 +61,7 @@ func (pm *processorManager) run(ctx context.Context, rawLogsChan <-chan entity.L
 		}
 	}
 
-	for i := 0; i < pm.workersCount; i++ {
+	for i := 0; i < int(pm.workersCount); i++ {
 		pm.wg.Go(func() {
 			spawnWorker(i)
 		})

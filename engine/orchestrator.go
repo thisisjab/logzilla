@@ -11,11 +11,13 @@ import (
 )
 
 type Config struct {
-	Sources              map[string]LogSource
-	Processors           map[string]LogProcessor
-	Storage              Storage
-	StorageFlushInterval time.Duration
-	BufferMaxSize        uint
+	Sources                      map[string]LogSource
+	Processors                   map[string]LogProcessor
+	Storage                      Storage
+	StorageFlushInterval         time.Duration
+	RawLogsBufferMaxSize         uint
+	ProcessedLogsInBufferMaxSize uint
+	ProcessorWorkersCount        uint
 }
 
 type Engine struct {
@@ -29,7 +31,10 @@ func New(cfg Config, logger *slog.Logger) (*Engine, error) {
 		return nil, err
 	}
 
-	return &Engine{cfg: cfg, logger: logger, storageManager: newStorageManager(logger, cfg.Storage, cfg.BufferMaxSize, cfg.StorageFlushInterval)}, nil
+	return &Engine{
+		cfg:            cfg,
+		logger:         logger,
+		storageManager: newStorageManager(logger, cfg.Storage, cfg.RawLogsBufferMaxSize, cfg.StorageFlushInterval)}, nil
 }
 
 func (c Config) validate() error {
@@ -43,8 +48,16 @@ func (c Config) validate() error {
 		return errors.New("no log storage is configured")
 	}
 
-	if c.BufferMaxSize == 0 && c.StorageFlushInterval == 0 {
+	if c.RawLogsBufferMaxSize == 0 && c.StorageFlushInterval == 0 {
 		return errors.New("buffer max size and storage flush interval cannot both be zero")
+	}
+
+	if c.ProcessedLogsInBufferMaxSize == 0 {
+		return errors.New("processed logs buffer max size cannot be zero")
+	}
+
+	if c.ProcessorWorkersCount == 0 {
+		return errors.New("processor workers cannot be zero")
 	}
 
 	return nil
@@ -55,9 +68,9 @@ func (e *Engine) Run(ctx context.Context) error {
 	rawLogs := e.consumeLogs(ctx)
 
 	var wg sync.WaitGroup
-	processedLogs := make(chan entity.LogRecord, 1000)
+	processedLogs := make(chan entity.LogRecord, e.cfg.ProcessedLogsInBufferMaxSize)
 
-	pm := newProcessorManager(e.logger, e.cfg.Sources, e.cfg.Processors, WorkersCount, 10*time.Second)
+	pm := newProcessorManager(e.logger, e.cfg.Sources, e.cfg.Processors, e.cfg.ProcessorWorkersCount, 10*time.Second)
 
 	wg.Go(func() { e.storageManager.run(ctx) })
 	wg.Go(func() { pm.run(ctx, rawLogs, processedLogs) })
@@ -79,9 +92,8 @@ func (e *Engine) Run(ctx context.Context) error {
 
 func (e *Engine) consumeLogs(ctx context.Context) <-chan entity.LogRecord {
 	// Increase buffer size to handle bursts (e.g., 5000 logs/sec)
-	const chanSize = 5000
-	rawLogs := make(chan entity.LogRecord, chanSize)
-	e.logger.Info("Created incoming logs channel.", "size", chanSize)
+	rawLogs := make(chan entity.LogRecord, e.cfg.RawLogsBufferMaxSize)
+	e.logger.Info("created incoming logs channel.", "size", e.cfg.RawLogsBufferMaxSize)
 
 	var sourceWg sync.WaitGroup
 

@@ -95,7 +95,7 @@ func (sm *storageManager) flushProcessedLogs(ctx context.Context, toFlush []enti
 			return
 		}
 
-		sm.logger.Debug("flushed processed logs successfuly", "count", len(toFlush))
+		sm.logger.Debug("flushed processed logs successfully", "count", len(toFlush))
 	})
 }
 
