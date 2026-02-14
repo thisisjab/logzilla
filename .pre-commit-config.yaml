@@ -10,6 +10,7 @@ repos:
     rev: v1.64.2
     hooks:
       - id: golangci-lint
+        args: [--fix, --timeout, 5m]
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
@@ -20,4 +21,5 @@ repos:
       - id: check-added-large-files
 
 default_install_hook_types:
+  - pre-commit
   - commit-msg

@@ -1,4 +1,4 @@
-# Contributing to Logzilla 
+# Contributing to Logzilla
 
 Thank you for your interest in contributing! To maintain high code quality and security, we ask that all contributors follow the guidelines below.
 
@@ -9,7 +9,7 @@ Begin by forking the repository to your own GitHub account. Clone your fork loca
 
 ```Bash
 git clone https://github.com/thisisjab/logzilla.git
-cd logzilla 
+cd logzilla
 ```
 
 2. Environment Setup

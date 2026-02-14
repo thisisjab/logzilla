@@ -1,0 +1,9 @@
+linters:
+  enable:
+    - gofmt
+    - goimports
+    - misspell
+    - errcheck
+
+issues:
+  fix: true
