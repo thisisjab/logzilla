@@ -20,6 +20,7 @@ type Config struct {
 	ProcessorWorkersCount      uint
 }
 
+// Engine orchestrates different components such as log sources (readers) and processors.
 type Engine struct {
 	cfg            Config
 	logger         *slog.Logger
@@ -65,6 +66,7 @@ func (c Config) validate() error {
 
 func (e *Engine) Run(ctx context.Context) error {
 	// Start consuming logs from all sources.
+	// rawLogs will contain all raw logs from all sources.
 	rawLogs := e.consumeLogs(ctx)
 
 	var wg sync.WaitGroup
@@ -72,13 +74,14 @@ func (e *Engine) Run(ctx context.Context) error {
 
 	pm := newProcessorManager(e.logger, e.cfg.Sources, e.cfg.Processors, e.cfg.ProcessorWorkersCount, 10*time.Second)
 
+	// Storage manager handles buffering, and periodic saves.
 	wg.Go(func() { e.storageManager.run(ctx) })
+	// Process manager handles fan-out pattern.
 	wg.Go(func() { pm.run(ctx, rawLogs, processedLogs) })
 
 	for {
 		select {
 		case <-ctx.Done():
-			// Context cancelled (e.g., user hit Ctrl+C)
 			wg.Wait()
 			return ctx.Err()
 		case p, ok := <-processedLogs:
@@ -91,12 +94,12 @@ func (e *Engine) Run(ctx context.Context) error {
 }
 
 func (e *Engine) consumeLogs(ctx context.Context) <-chan entity.LogRecord {
-	// Increase buffer size to handle bursts (e.g., 5000 logs/sec)
 	rawLogs := make(chan entity.LogRecord, e.cfg.RawLogsBufferMaxSize)
 	e.logger.Info("created incoming logs channel.", "size", e.cfg.RawLogsBufferMaxSize)
 
 	var sourceWg sync.WaitGroup
 
+	// Spawn sources
 	for n, s := range e.cfg.Sources {
 		sourceWg.Add(1)
 		go func(name string, src LogSource) {

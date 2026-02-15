@@ -15,6 +15,7 @@ type LogProcessor interface {
 	Process(logRecord entity.LogRecord) (entity.LogRecord, error)
 }
 
+// processorManager provides multiple workers (fan-out pattern) that process incoming logs (raw logs actually).
 type processorManager struct {
 	interval     time.Duration
 	sources      map[string]LogSource
@@ -34,6 +35,7 @@ func newProcessorManager(logger *slog.Logger, sources map[string]LogSource, proc
 	}
 }
 
+// run reads raw logs and processes the log, then pushes the processed log back to results channel to be further processed (stored).
 func (pm *processorManager) run(ctx context.Context, rawLogsChan <-chan entity.LogRecord, results chan<- entity.LogRecord) {
 	spawnWorker := func(workerId int) {
 		for {
@@ -70,6 +72,7 @@ func (pm *processorManager) run(ctx context.Context, rawLogsChan <-chan entity.L
 	pm.wg.Wait()
 }
 
+// processLog is the actual function that processes a raw log based on it's source and corresponding processors.
 func (pm *processorManager) processLog(rawLog entity.LogRecord) entity.LogRecord {
 	src, ok := pm.sources[rawLog.Source]
 	if !ok {
