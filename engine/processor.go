@@ -4,20 +4,19 @@ import (
 	"context"
 	"log/slog"
 	"sync"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/thisisjab/logzilla/entity"
 )
 
-// LogProcessor is an interface that defines the contract for log processors.
+// LogProcessor defines the contract for log processors.
 type LogProcessor interface {
+	Name() string
 	Process(logRecord entity.LogRecord) (entity.LogRecord, error)
 }
 
 // processorManager provides multiple workers (fan-out pattern) that process incoming logs (raw logs actually).
 type processorManager struct {
-	interval     time.Duration
 	sources      map[string]LogSource
 	processors   map[string]LogProcessor
 	logger       *slog.Logger
@@ -25,11 +24,20 @@ type processorManager struct {
 	wg           sync.WaitGroup
 }
 
-func newProcessorManager(logger *slog.Logger, sources map[string]LogSource, processors map[string]LogProcessor, workersCount uint, interval time.Duration) *processorManager {
+func newProcessorManager(logger *slog.Logger, sources []LogSource, processors []LogProcessor, workersCount uint) *processorManager {
+	s := make(map[string]LogSource)
+	p := make(map[string]LogProcessor)
+
+	for _, source := range sources {
+		s[source.Name()] = source
+	}
+	for _, processor := range processors {
+		p[processor.Name()] = processor
+	}
+
 	return &processorManager{
-		interval:     interval,
-		sources:      sources,
-		processors:   processors,
+		sources:      s,
+		processors:   p,
 		logger:       logger,
 		workersCount: workersCount,
 	}

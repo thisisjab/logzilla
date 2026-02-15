@@ -3,6 +3,7 @@ package engine
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"sync"
 	"time"
@@ -11,8 +12,8 @@ import (
 )
 
 type Config struct {
-	Sources                    map[string]LogSource
-	Processors                 map[string]LogProcessor
+	Sources                    []LogSource
+	Processors                 []LogProcessor
 	Storage                    Storage
 	StorageFlushInterval       time.Duration
 	RawLogsBufferMaxSize       uint
@@ -65,6 +66,12 @@ func (c Config) validate() error {
 }
 
 func (e *Engine) Run(ctx context.Context) error {
+	// Connect to database
+	err := e.cfg.Storage.Connect(ctx)
+	if err != nil {
+		return fmt.Errorf("cannot establish a connection to the storage: %w", err)
+	}
+
 	// Start consuming logs from all sources.
 	// rawLogs will contain all raw logs from all sources.
 	rawLogs := e.consumeLogs(ctx)
@@ -72,7 +79,7 @@ func (e *Engine) Run(ctx context.Context) error {
 	var wg sync.WaitGroup
 	processedLogs := make(chan entity.LogRecord, e.cfg.ProcessedLogsBufferMaxSize)
 
-	pm := newProcessorManager(e.logger, e.cfg.Sources, e.cfg.Processors, e.cfg.ProcessorWorkersCount, 10*time.Second)
+	pm := newProcessorManager(e.logger, e.cfg.Sources, e.cfg.Processors, e.cfg.ProcessorWorkersCount)
 
 	// Storage manager handles buffering, and periodic saves.
 	wg.Go(func() { e.storageManager.run(ctx) })
@@ -83,6 +90,12 @@ func (e *Engine) Run(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			wg.Wait()
+
+			err := e.cfg.Storage.Close(ctx)
+			if err != nil {
+				return fmt.Errorf("cannot close the storage connection: %w", err)
+			}
+
 			return ctx.Err()
 		case p, ok := <-processedLogs:
 			if !ok {
@@ -100,7 +113,7 @@ func (e *Engine) consumeLogs(ctx context.Context) <-chan entity.LogRecord {
 	var sourceWg sync.WaitGroup
 
 	// Spawn sources
-	for n, s := range e.cfg.Sources {
+	for _, s := range e.cfg.Sources {
 		sourceWg.Add(1)
 		go func(name string, src LogSource) {
 			defer sourceWg.Done()
@@ -109,7 +122,7 @@ func (e *Engine) consumeLogs(ctx context.Context) <-chan entity.LogRecord {
 			if err != nil {
 				e.logger.Error("failed to start log source.", "name", name, "error", err)
 			}
-		}(n, s)
+		}(s.Name(), s)
 	}
 
 	go func() {

@@ -12,7 +12,9 @@ import (
 // Storage represents a storage interface for the engine.
 // Storage needs handle buffering by itself.
 type Storage interface {
+	Connect(ctx context.Context) error
 	StoreProcessedLogs(ctx context.Context, logs ...entity.LogRecord) error
+	Close(ctx context.Context) error
 }
 
 // storageManager manages storage operations like inserting, buffering, and flushing logs.

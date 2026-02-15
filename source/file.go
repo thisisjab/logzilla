@@ -13,34 +13,36 @@ import (
 	"github.com/thisisjab/logzilla/entity"
 )
 
+type FileLogSourceConfig struct {
+	Name           string   `yaml:"name"`
+	FilePath       string   `yaml:"path"`
+	ProcessorNames []string `yaml:"processors"`
+}
+
 // FileLogSource works by watching a file for changes and reading new lines as they are written.
 type FileLogSource struct {
-	sourceName     string
-	filePath       string
-	processorNames []string
-	logger         *slog.Logger
+	cfg    FileLogSourceConfig
+	logger *slog.Logger
 }
 
 // NewFileLogSource creates a new FileLogSource instance.
-func NewFileLogSource(logger *slog.Logger, sourceName, filePath string, processorNames []string) *FileLogSource {
+func NewFileLogSource(logger *slog.Logger, cfg FileLogSourceConfig) (*FileLogSource, error) {
 	return &FileLogSource{
-		logger:         logger,
-		filePath:       filePath,
-		sourceName:     sourceName,
-		processorNames: processorNames,
-	}
+		logger: logger,
+		cfg:    cfg,
+	}, nil
 }
 
-func (f *FileLogSource) SourceName() string {
-	return f.sourceName
+func (f *FileLogSource) Name() string {
+	return f.cfg.Name
 }
 
 func (f *FileLogSource) ProcessorNames() []string {
-	return f.processorNames
+	return f.cfg.ProcessorNames
 }
 
 func (f *FileLogSource) Provide(ctx context.Context, logChan chan<- entity.LogRecord) error {
-	file, err := os.Open(f.filePath)
+	file, err := os.Open(f.cfg.FilePath)
 	if err != nil {
 		return fmt.Errorf("cannot open file: %w", err)
 	}
@@ -59,7 +61,7 @@ func (f *FileLogSource) Provide(ctx context.Context, logChan chan<- entity.LogRe
 	}
 	defer watcher.Close()
 
-	if err := watcher.Add(f.filePath); err != nil {
+	if err := watcher.Add(f.cfg.FilePath); err != nil {
 		return fmt.Errorf("cannot add file to watcher: %w", err)
 	}
 
@@ -92,7 +94,7 @@ func (f *FileLogSource) Provide(ctx context.Context, logChan chan<- entity.LogRe
 				line, err := reader.ReadBytes('\n')
 				if len(line) > 0 {
 					l := entity.LogRecord{
-						Source:    f.SourceName(),
+						Source:    f.Name(),
 						RawData:   line,
 						Timestamp: time.Now(),
 					}

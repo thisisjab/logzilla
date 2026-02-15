@@ -11,10 +11,6 @@ import (
 	"github.com/thisisjab/logzilla/entity"
 )
 
-type ClickHouseStorage struct {
-	conn clickhouse.Conn
-}
-
 type ClickHouseStorageConfig struct {
 	Addr     []string `yaml:"addr"`
 	Database string   `yaml:"database"`
@@ -22,40 +18,13 @@ type ClickHouseStorageConfig struct {
 	Password string   `yaml:"password"`
 }
 
+type ClickHouseStorage struct {
+	conn clickhouse.Conn
+	cfg  ClickHouseStorageConfig
+}
+
 func NewClickHouseStorage(cfg ClickHouseStorageConfig) (*ClickHouseStorage, error) {
-	// FIXME: implement a wait-for-ready procedure
-
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	conn, err := clickhouse.Open(&clickhouse.Options{
-		Addr: cfg.Addr,
-		Auth: clickhouse.Auth{
-			Database: cfg.Database,
-			Username: cfg.Username,
-			Password: cfg.Password,
-		},
-		Settings: clickhouse.Settings{
-			"allow_experimental_json_type": 1, // This is for supporting JSON columns
-		},
-		DialTimeout: 5 * time.Second,
-		Compression: &clickhouse.Compression{
-			Method: clickhouse.CompressionLZ4,
-		},
-	})
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect: %v", err)
-	}
-
-	// Since we only have two tables, for now we don't need to introduce go-migrate
-	if err := setupClickHouseTables(ctx, conn); err != nil {
-		return nil, fmt.Errorf("failed to create table: %v", err)
-	}
-
-	return &ClickHouseStorage{
-		conn: conn,
-	}, nil
+	return &ClickHouseStorage{cfg: cfg}, nil
 }
 
 func setupClickHouseTables(ctx context.Context, conn driver.Conn) error {
@@ -95,7 +64,44 @@ func setupClickHouseTables(ctx context.Context, conn driver.Conn) error {
 	return err
 }
 
-func (s *ClickHouseStorage) Close() error {
+func (s *ClickHouseStorage) Connect(ctx context.Context) error {
+	// FIXME: implement a wait-for-ready procedure
+
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	conn, err := clickhouse.Open(&clickhouse.Options{
+		Addr: s.cfg.Addr,
+		Auth: clickhouse.Auth{
+			Database: s.cfg.Database,
+			Username: s.cfg.Username,
+			Password: s.cfg.Password,
+		},
+		Settings: clickhouse.Settings{
+			"allow_experimental_json_type": 1, // This is for supporting JSON columns
+		},
+		DialTimeout: 5 * time.Second,
+		Compression: &clickhouse.Compression{
+			Method: clickhouse.CompressionLZ4,
+		},
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to connect: %v", err)
+	}
+
+	// Since we only have two tables, for now we don't need to introduce go-migrate
+	if err := setupClickHouseTables(ctx, conn); err != nil {
+		return fmt.Errorf("failed to create table: %v", err)
+	}
+
+	return nil
+}
+
+func (s *ClickHouseStorage) Close(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
 	return s.conn.Close()
 }
 

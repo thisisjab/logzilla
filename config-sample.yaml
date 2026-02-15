@@ -1,0 +1,34 @@
+storage:
+  type: clickhouse
+  config:
+    db: logzilla
+    user: logzilla
+    password: logzilla
+processors:
+  - name: json-parser
+    type: json
+    config:
+      - timestamp: "datetime"
+        message: "message"
+        level: "priority"
+  - name: fast-json-parser
+    type: fastjson
+    config:
+      - timestamp: "datetime"
+        message: "message"
+        level: "priority"
+  - name: custom-parser
+    type: lua
+    config:
+      - script: "./lua/test.lua"
+sources:
+  - name: main-server
+    type: file
+    processors: ["fastjson", "custom-parser"]
+    config:
+      - path: "/var/log/main-server.log"
+  - name: another-server
+    type: db-pull
+    processors: ["fastjson"]
+    config:
+      # whatever

@@ -9,21 +9,26 @@ import (
 	"github.com/thisisjab/logzilla/entity"
 )
 
-// JsonLogProcessor is a simple JSON log processor. It parses JSON logs and extracts log level, message,
-// and timestamp, and any other fields will be considered as metadata.
-type JsonLogProcessor struct {
+type JsonLogProcessorConfig struct {
+	name                  string
 	logLevelFieldName     string
 	logMessageFieldName   string
 	logTimestampFieldName string
 }
 
+// JsonLogProcessor is a simple JSON log processor. It parses JSON logs and extracts log level, message,
+// and timestamp, and any other fields will be considered as metadata.
+type JsonLogProcessor struct {
+	cfg JsonLogProcessorConfig
+}
+
 // NewJsonLogProcessor creates a new instance of JsonLogProcessor.
-func NewJsonLogProcessor(logLevelFieldName, logMessageFieldName, logTimestampFieldName string) *JsonLogProcessor {
-	return &JsonLogProcessor{
-		logLevelFieldName:     logLevelFieldName,
-		logMessageFieldName:   logMessageFieldName,
-		logTimestampFieldName: logTimestampFieldName,
-	}
+func NewJsonLogProcessor(cfg JsonLogProcessorConfig) (*JsonLogProcessor, error) {
+	return &JsonLogProcessor{cfg: cfg}, nil
+}
+
+func (p *JsonLogProcessor) Name() string {
+	return p.cfg.name
 }
 
 // Process parses a JSON log record and extracts log level, message, and timestamp, and metadata.
@@ -36,7 +41,7 @@ func (p *JsonLogProcessor) Process(record entity.LogRecord) (entity.LogRecord, e
 	}
 
 	// Parsing time
-	val, ok := data[p.logTimestampFieldName]
+	val, ok := data[p.cfg.logTimestampFieldName]
 	timestampValue, isString := val.(string)
 	if !ok || !isString || timestampValue == "" {
 		return entity.LogRecord{}, errors.New("timestamp field is missing or not a string")
@@ -46,21 +51,21 @@ func (p *JsonLogProcessor) Process(record entity.LogRecord) (entity.LogRecord, e
 	if err != nil {
 		return entity.LogRecord{}, fmt.Errorf("cannot parse timestamp: %w", err)
 	}
-	delete(data, p.logTimestampFieldName)
+	delete(data, p.cfg.logTimestampFieldName)
 
 	// Parsing level
-	val, ok = data[p.logLevelFieldName]
+	val, ok = data[p.cfg.logLevelFieldName]
 	levelValue, isString := val.(string)
 	if !ok || !isString {
 		return entity.LogRecord{}, errors.New("level field is missing or not a string")
 	}
 	level := parseLevel(levelValue)
-	delete(data, p.logLevelFieldName)
+	delete(data, p.cfg.logLevelFieldName)
 
 	// Getting message
-	val = data[p.logMessageFieldName]
+	val = data[p.cfg.logMessageFieldName]
 	messageValue, _ := val.(string)
-	delete(data, p.logMessageFieldName)
+	delete(data, p.cfg.logMessageFieldName)
 
 	return entity.LogRecord{
 		Level:     level,
