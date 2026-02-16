@@ -19,7 +19,7 @@ import (
 )
 
 func main() {
-	// 1. Create a context that can be cancelled
+	// Create a context that can be cancelled
 	ctx, cancel := context.WithCancel(context.Background())
 
 	cfgPath := flag.String("config", "./.config.yaml", "path to config file")
@@ -62,9 +62,10 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Run the engine.
+	// Run engine
 	if err := engine.Run(ctx); err != nil {
 		logger.Error("engine error.", "error", err)
+		cancel()
 	}
 
 	logger.Info("engine stopped.")
@@ -125,7 +126,7 @@ func parseConfig(cfg Config) (*engine.Config, *slog.Logger, error) {
 		processors[i] = p
 	}
 
-	sources := make([]engine.LogSource, len(cfg.Processors))
+	sources := make([]engine.LogSource, len(cfg.Sources))
 	for i, sc := range cfg.Sources {
 		s, err := parseSourceConfig(logger, sc)
 		if err != nil {
@@ -210,6 +211,9 @@ func parseSourceConfig(logger *slog.Logger, cfg SourceConfig) (engine.LogSource,
 			return nil, fmt.Errorf("cannot create file source: %w", err)
 		}
 
+		fileConfig.Name = cfg.Name
+		fileConfig.ProcessorNames = cfg.Processors
+
 		s, err := source.NewFileLogSource(logger, fileConfig)
 		if err != nil {
 			return nil, fmt.Errorf("cannot create file source: %w", err)
@@ -230,7 +234,22 @@ func parseProcessorConfig(logger *slog.Logger, cfg ProcessorConfig) (engine.LogP
 			return nil, fmt.Errorf("cannot create json processor: %w", err)
 		}
 
+		jsonConfig.Name = cfg.Name
+
 		p, err := processor.NewJsonLogProcessor(jsonConfig)
+		if err != nil {
+			return nil, fmt.Errorf("cannot create json processor: %w", err)
+		}
+
+		return p, nil
+	case "lua":
+		var luaConfig processor.LuaLogProcessorConfig
+		err := Remarshal(cfg.Config, &luaConfig)
+		if err != nil {
+			return nil, fmt.Errorf("cannot create lua processor: %w", err)
+		}
+
+		p, err := processor.NewLuaLogProcessor(luaConfig)
 		if err != nil {
 			return nil, fmt.Errorf("cannot create json processor: %w", err)
 		}

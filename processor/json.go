@@ -10,10 +10,10 @@ import (
 )
 
 type JsonLogProcessorConfig struct {
-	name                  string
-	logLevelFieldName     string
-	logMessageFieldName   string
-	logTimestampFieldName string
+	Name                  string `yaml:"name"`
+	LogLevelFieldName     string `yaml:"level_field"`
+	LogMessageFieldName   string `yaml:"message_field"`
+	LogTimestampFieldName string `yaml:"timestamp_field"`
 }
 
 // JsonLogProcessor is a simple JSON log processor. It parses JSON logs and extracts log level, message,
@@ -28,7 +28,7 @@ func NewJsonLogProcessor(cfg JsonLogProcessorConfig) (*JsonLogProcessor, error) 
 }
 
 func (p *JsonLogProcessor) Name() string {
-	return p.cfg.name
+	return p.cfg.Name
 }
 
 // Process parses a JSON log record and extracts log level, message, and timestamp, and metadata.
@@ -41,7 +41,7 @@ func (p *JsonLogProcessor) Process(record entity.LogRecord) (entity.LogRecord, e
 	}
 
 	// Parsing time
-	val, ok := data[p.cfg.logTimestampFieldName]
+	val, ok := data[p.cfg.LogTimestampFieldName]
 	timestampValue, isString := val.(string)
 	if !ok || !isString || timestampValue == "" {
 		return entity.LogRecord{}, errors.New("timestamp field is missing or not a string")
@@ -51,21 +51,21 @@ func (p *JsonLogProcessor) Process(record entity.LogRecord) (entity.LogRecord, e
 	if err != nil {
 		return entity.LogRecord{}, fmt.Errorf("cannot parse timestamp: %w", err)
 	}
-	delete(data, p.cfg.logTimestampFieldName)
+	delete(data, p.cfg.LogTimestampFieldName)
 
 	// Parsing level
-	val, ok = data[p.cfg.logLevelFieldName]
+	val, ok = data[p.cfg.LogLevelFieldName]
 	levelValue, isString := val.(string)
 	if !ok || !isString {
 		return entity.LogRecord{}, errors.New("level field is missing or not a string")
 	}
 	level := parseLevel(levelValue)
-	delete(data, p.cfg.logLevelFieldName)
+	delete(data, p.cfg.LogLevelFieldName)
 
 	// Getting message
-	val = data[p.cfg.logMessageFieldName]
+	val = data[p.cfg.LogMessageFieldName]
 	messageValue, _ := val.(string)
-	delete(data, p.cfg.logMessageFieldName)
+	delete(data, p.cfg.LogMessageFieldName)
 
 	return entity.LogRecord{
 		Level:     level,

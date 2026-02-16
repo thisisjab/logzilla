@@ -84,20 +84,20 @@ func (pm *processorManager) run(ctx context.Context, rawLogsChan <-chan entity.L
 func (pm *processorManager) processLog(rawLog entity.LogRecord) entity.LogRecord {
 	src, ok := pm.sources[rawLog.Source]
 	if !ok {
-		pm.logger.Error("Source not found", "source", rawLog.Source)
+		pm.logger.Error("source not found", "source", rawLog.Source)
 		return rawLog
 	}
 
 	for _, pName := range src.ProcessorNames() {
 		p := pm.processors[pName]
 		if p == nil {
-			pm.logger.Warn("Processor not found", "processor", pName)
+			pm.logger.Warn("processor not found", "processor", pName)
 			continue
 		}
 
 		processedLog, err := p.Process(rawLog)
 		if err != nil {
-			pm.logger.Error("Failed to process log", "error", err)
+			pm.logger.Error("failed to process log", "processor", pName, "error", err)
 			continue
 		}
 
