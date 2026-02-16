@@ -22,7 +22,7 @@ func main() {
 	// 1. Create a context that can be cancelled
 	ctx, cancel := context.WithCancel(context.Background())
 
-	cfgPath := flag.String("config", "./config.yaml", "path to config file")
+	cfgPath := flag.String("config", "./.config.yaml", "path to config file")
 	flag.Parse()
 
 	fileContent, err := os.ReadFile(*cfgPath)
@@ -39,6 +39,7 @@ func main() {
 	if err != nil {
 		if logger != nil {
 			logger.Error("cannot parse config file", "error", err)
+			os.Exit(1)
 		}
 		panic(fmt.Errorf("cannot parse config file: %w", err))
 	}
@@ -70,14 +71,14 @@ func main() {
 }
 
 type Config struct {
-	Logger                     LoggerConfig      `yaml:"logger"`
-	Storage                    StorageConfig     `yaml:"storage"`
-	Processors                 []ProcessorConfig `yaml:"processors"`
-	Sources                    []SourceConfig    `yaml:"sources"`
-	RawLogsBufferMaxSize       uint              `yaml:"raw_logs_buffer_max_size"`
-	StorageFlushInterval       time.Duration     `yaml:"storage_flush_interval"`
-	ProcessedLogsBufferMaxSize uint              `yaml:"processed_logs_buffer_max_size"`
-	ProcessorWorkersCount      uint              `yaml:"processor_workers_count"`
+	Logger                  LoggerConfig      `yaml:"logger"`
+	Storage                 StorageConfig     `yaml:"storage"`
+	Processors              []ProcessorConfig `yaml:"processors"`
+	Sources                 []SourceConfig    `yaml:"sources"`
+	RawLogsBufferSize       uint              `yaml:"raw_logs_buffer_size"`
+	StorageFlushInterval    time.Duration     `yaml:"storage_flush_interval"`
+	ProcessedLogsBufferSize uint              `yaml:"processed_logs_buffer_size"`
+	ProcessorWorkersCount   uint              `yaml:"processor_workers_count"`
 }
 
 type LoggerConfig struct {
@@ -112,31 +113,31 @@ func parseConfig(cfg Config) (*engine.Config, *slog.Logger, error) {
 
 	st, err := parseStorageConfig(cfg.Storage)
 	if err != nil {
-		return nil, nil, fmt.Errorf("cannot create storage: %w", err)
+		return nil, logger, fmt.Errorf("cannot create storage: %w", err)
 	}
 
 	processors := make([]engine.LogProcessor, len(cfg.Processors))
-	for _, pc := range cfg.Processors {
+	for i, pc := range cfg.Processors {
 		p, err := parseProcessorConfig(logger, pc)
 		if err != nil {
-			return nil, nil, fmt.Errorf("cannot create processor: %w", err)
+			return nil, logger, fmt.Errorf("cannot create processor `%s`: %w", pc.Name, err)
 		}
-		processors = append(processors, p)
+		processors[i] = p
 	}
 
 	sources := make([]engine.LogSource, len(cfg.Processors))
-	for _, sc := range cfg.Sources {
+	for i, sc := range cfg.Sources {
 		s, err := parseSourceConfig(logger, sc)
 		if err != nil {
-			return nil, nil, fmt.Errorf("cannot create source: %w", err)
+			return nil, logger, fmt.Errorf("cannot create source `%s`: %w", sc.Name, err)
 		}
-		sources = append(sources, s)
+		sources[i] = s
 	}
 
 	return &engine.Config{
-		RawLogsBufferMaxSize:       cfg.RawLogsBufferMaxSize,
+		RawLogsBufferMaxSize:       cfg.RawLogsBufferSize,
 		StorageFlushInterval:       cfg.StorageFlushInterval,
-		ProcessedLogsBufferMaxSize: cfg.ProcessedLogsBufferMaxSize,
+		ProcessedLogsBufferMaxSize: cfg.ProcessedLogsBufferSize,
 		ProcessorWorkersCount:      cfg.ProcessorWorkersCount,
 		Storage:                    st,
 		Processors:                 processors,
@@ -182,9 +183,10 @@ func parseLoggerConfig(cfg LoggerConfig) (*slog.Logger, error) {
 func parseStorageConfig(cfg StorageConfig) (engine.Storage, error) {
 	switch cfg.Type {
 	case "clickhouse":
-		clickHouseConfig, ok := cfg.Config.(storage.ClickHouseStorageConfig)
-		if !ok {
-			return nil, fmt.Errorf("cannot parse clickhouse storage config")
+		var clickHouseConfig storage.ClickHouseStorageConfig
+
+		if err := Remarshal(cfg.Config, &clickHouseConfig); err != nil {
+			return nil, fmt.Errorf("cannot parse clickhouse storage config: %w", err)
 		}
 
 		s, err := storage.NewClickHouseStorage(clickHouseConfig)
@@ -193,6 +195,7 @@ func parseStorageConfig(cfg StorageConfig) (engine.Storage, error) {
 		}
 
 		return s, nil
+
 	default:
 		return nil, fmt.Errorf("invalid storage type: %s", cfg.Type)
 	}
@@ -201,9 +204,10 @@ func parseStorageConfig(cfg StorageConfig) (engine.Storage, error) {
 func parseSourceConfig(logger *slog.Logger, cfg SourceConfig) (engine.LogSource, error) {
 	switch cfg.Type {
 	case "file":
-		fileConfig, ok := cfg.Config.(source.FileLogSourceConfig)
-		if !ok {
-			return nil, fmt.Errorf("cannot parse file source config")
+		var fileConfig source.FileLogSourceConfig
+		err := Remarshal(cfg.Config, &fileConfig)
+		if err != nil {
+			return nil, fmt.Errorf("cannot create file source: %w", err)
 		}
 
 		s, err := source.NewFileLogSource(logger, fileConfig)
@@ -220,9 +224,10 @@ func parseSourceConfig(logger *slog.Logger, cfg SourceConfig) (engine.LogSource,
 func parseProcessorConfig(logger *slog.Logger, cfg ProcessorConfig) (engine.LogProcessor, error) {
 	switch cfg.Type {
 	case "json":
-		jsonConfig, ok := cfg.Config.(processor.JsonLogProcessorConfig)
-		if !ok {
-			return nil, fmt.Errorf("cannot parse json processor config")
+		var jsonConfig processor.JsonLogProcessorConfig
+		err := Remarshal(cfg.Config, &jsonConfig)
+		if err != nil {
+			return nil, fmt.Errorf("cannot create json processor: %w", err)
 		}
 
 		p, err := processor.NewJsonLogProcessor(jsonConfig)
@@ -234,4 +239,22 @@ func parseProcessorConfig(logger *slog.Logger, cfg ProcessorConfig) (engine.LogP
 	default:
 		return nil, fmt.Errorf("invalid log processor type: %s", cfg.Type)
 	}
+}
+
+// Remarshal takes an input value, marshals it to YAML, and then unmarshals it into a new value of the same type.
+// This is useful for converting generic interfaces (like map[string]any) into concrete struct types.
+// The output parameter must be a pointer to the target type.
+func Remarshal(input any, output any) error {
+	// Marshal the input to YAML
+	yamlBytes, err := yaml.Marshal(input)
+	if err != nil {
+		return fmt.Errorf("failed to marshal to YAML: %w", err)
+	}
+
+	// Unmarshal the YAML into the output
+	if err := yaml.Unmarshal(yamlBytes, output); err != nil {
+		return fmt.Errorf("failed to unmarshal from YAML: %w", err)
+	}
+
+	return nil
 }

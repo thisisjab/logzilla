@@ -1,34 +1,27 @@
+processor_workers_count: 10
+raw_logs_buffer_size: 10
+processed_logs_buffer_size: 10
+storage_flush_interval: 10s
 storage:
   type: clickhouse
   config:
-    db: logzilla
-    user: logzilla
+    addr: ["localhost:9000"]
+    database: logzilla
+    username: logzilla
     password: logzilla
 processors:
   - name: json-parser
     type: json
     config:
-      - timestamp: "datetime"
-        message: "message"
-        level: "priority"
-  - name: fast-json-parser
-    type: fastjson
-    config:
-      - timestamp: "datetime"
-        message: "message"
-        level: "priority"
-  - name: custom-parser
-    type: lua
-    config:
-      - script: "./lua/test.lua"
+      timestamp: "t"
+      message: "m"
+      level: "l"
 sources:
   - name: main-server
     type: file
-    processors: ["fastjson", "custom-parser"]
+    processors: ["json-parser"]
     config:
-      - path: "/var/log/main-server.log"
-  - name: another-server
-    type: db-pull
-    processors: ["fastjson"]
-    config:
-      # whatever
+      path: "/var/log/main-server.log"
+logger:
+  type: colored-text
+  level: debug

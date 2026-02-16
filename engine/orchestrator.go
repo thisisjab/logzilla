@@ -51,7 +51,7 @@ func (c Config) validate() error {
 	}
 
 	if c.RawLogsBufferMaxSize == 0 && c.StorageFlushInterval == 0 {
-		return errors.New("buffer max size and storage flush interval cannot both be zero")
+		return errors.New("raw logs buffer max size and storage flush interval cannot both be zero")
 	}
 
 	if c.ProcessedLogsBufferMaxSize == 0 {
