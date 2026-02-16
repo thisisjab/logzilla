@@ -90,6 +90,8 @@ func (s *ClickHouseStorage) Connect(ctx context.Context) error {
 		return fmt.Errorf("failed to connect: %v", err)
 	}
 
+	s.conn = conn
+
 	// Since we only have two tables, for now we don't need to introduce go-migrate
 	if err := setupClickHouseTables(ctx, conn); err != nil {
 		return fmt.Errorf("failed to create table: %v", err)
