@@ -39,6 +39,13 @@ func main() {
 		panic(fmt.Errorf("cannot parse config file: %w", err))
 	}
 
+	// Panic recovery
+	defer func() {
+		if r := recover(); r != nil {
+			logger.Error("engine panic", "error", r)
+		}
+	}()
+
 	// Setup signal handling to catch Ctrl+C (SIGINT) or Terminate (SIGTERM)
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
