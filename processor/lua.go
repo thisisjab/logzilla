@@ -109,6 +109,8 @@ func (lp *LuaLogProcessor) Process(record entity.LogRecord) (entity.LogRecord, e
 	}
 
 	return entity.LogRecord{
+		ID:        record.ID,
+		Source:    record.Source,
 		Timestamp: luaTimestamp,
 		Level:     parseLevel(luaLevel),
 		Message:   luaMessage,
