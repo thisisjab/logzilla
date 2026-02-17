@@ -1,5 +1,8 @@
 # TODOs
 
+- [ ] Support for saving unprocessed logs (due to processor failure)
+- [ ] Add job for re-processing failed logs
+
 ## Documentation
 
 - [x] Add more sample configuration files and explain all possible values
@@ -7,8 +10,8 @@
 ## Engine
 
 - [x] Remove `IsProcessed ` field since we don't need it anymore
-- [ ] Handle panics using a recovery
-- [ ] Check if configuration works as expected
+- [x] Handle panics using a recovery
+- [x] Check if configuration works as expected
 - [ ] Check if sources are saved correctly
 
 ## Lua Processor
