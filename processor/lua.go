@@ -11,7 +11,7 @@ import (
 )
 
 type LuaLogProcessorConfig struct {
-	Name       string `yaml:"name"`
+	Name       string `yaml:"-"`
 	ScriptPath string `yaml:"script-path"`
 }
 

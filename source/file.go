@@ -14,7 +14,7 @@ import (
 )
 
 type FileLogSourceConfig struct {
-	Name           string   `yaml:"name"`
+	Name           string   `yaml:"-"`
 	FilePath       string   `yaml:"path"`
 	ProcessorNames []string `yaml:"processors"`
 }

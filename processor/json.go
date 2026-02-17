@@ -10,7 +10,7 @@ import (
 )
 
 type JsonLogProcessorConfig struct {
-	Name                  string `yaml:"name"`
+	Name                  string `yaml:"-"`
 	LogLevelFieldName     string `yaml:"level_field"`
 	LogMessageFieldName   string `yaml:"message_field"`
 	LogTimestampFieldName string `yaml:"timestamp_field"`

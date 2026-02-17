@@ -2,11 +2,11 @@
 
 ## Documentation
 
-- [ ] Add more sample configuration files and explain all possible values
+- [x] Add more sample configuration files and explain all possible values
 
 ## Engine
 
-- [ ] Remove `IsProcessed ` field since we don't need it anymore
+- [x] Remove `IsProcessed ` field since we don't need it anymore
 - [ ] Handle panics using a recovery
 - [ ] Check if configuration works as expected
 - [ ] Check if sources are saved correctly
