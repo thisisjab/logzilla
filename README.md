@@ -19,4 +19,4 @@ This section will be filled in later.
 
 # How to contribute
 
-Please read the [CONTRIBUTING.md](CONTRIBUTING.md) file for more information.
+Please read the [CONTRIBUTING.md](docs/CONTRIBUTING.md) file for more information.
