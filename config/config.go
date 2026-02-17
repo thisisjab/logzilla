@@ -192,6 +192,8 @@ func parseProcessorConfig(logger *slog.Logger, cfg ProcessorConfig) (engine.LogP
 			return nil, fmt.Errorf("cannot create lua processor: %w", err)
 		}
 
+		luaConfig.Name = cfg.Name
+
 		p, err := processor.NewLuaLogProcessor(luaConfig)
 		if err != nil {
 			return nil, fmt.Errorf("cannot create json processor: %w", err)
