@@ -65,8 +65,6 @@ func setupClickHouseTables(ctx context.Context, conn driver.Conn) error {
 }
 
 func (s *ClickHouseStorage) Connect(ctx context.Context) error {
-	// FIXME: implement a wait-for-ready procedure
-
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
@@ -88,6 +86,10 @@ func (s *ClickHouseStorage) Connect(ctx context.Context) error {
 
 	if err != nil {
 		return fmt.Errorf("failed to connect: %v", err)
+	}
+
+	if err := conn.Ping(ctx); err != nil {
+		return fmt.Errorf("failed to ping the database: %w", err)
 	}
 
 	s.conn = conn
