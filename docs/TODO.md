@@ -19,9 +19,9 @@
 - [x] Check if log source is saved correctly
 - [x] Make sure JSON support works as expected
 - [ ] Test execution speed + ram usage
-- [ ] Check if utilities included with lua VM is enough by checking datetime parsing, regex, map, etc
-- [ ] Test if lua maps are parsed decently
-- [ ] Validate VM is sandboxed (even at beginner level)
+- [x] Check if utilities included with lua VM is enough by checking datetime parsing, regex, map, etc
+- [x] Test if lua maps are parsed decently
+- [x] Validate VM is sandboxed (even at beginner level)
 
 ## UI
 

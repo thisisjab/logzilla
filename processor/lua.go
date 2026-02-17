@@ -130,9 +130,10 @@ func luaTableToMap(table *lua.LTable) map[string]any {
 func convertLuaValue(value lua.LValue) any {
 	switch v := value.(type) {
 	case *lua.LTable:
-		// Check if it's an array (has sequential integer keys starting at 1)
-		// Or just treat everything as a map for consistency in log metadata
-		return luaTableToMap(v)
+		if isArray(v) {
+			return convertArray(v) // Return []any
+		}
+		return convertDictionary(v) // Return map[string]any
 	case lua.LNumber:
 		return float64(v)
 	case lua.LString:
@@ -149,4 +150,35 @@ func convertLuaValue(value lua.LValue) any {
 		// Fallback for types we don't explicitly handle (like functions or userdata)
 		return v.String()
 	}
+}
+
+// Helper to check if table is an array
+func isArray(table *lua.LTable) bool {
+	// If it has key 1, it's probably an array
+	// (arrays in Lua always have consecutive numbers starting at 1)
+	return table.RawGetInt(1) != lua.LNil
+}
+
+// Convert array: {"a", "b", 132} → ["a", "b", 132]
+func convertArray(table *lua.LTable) []any {
+	result := []any{}
+	for i := 1; ; i++ {
+		val := table.RawGetInt(i)
+		if val == lua.LNil {
+			break
+		}
+		result = append(result, convertLuaValue(val))
+	}
+	return result
+}
+
+// Convert dictionary: {name = "John"} to {"name": "John"}
+func convertDictionary(table *lua.LTable) map[string]any {
+	result := make(map[string]any)
+	table.ForEach(func(key, value lua.LValue) {
+		if strKey, ok := key.(lua.LString); ok {
+			result[string(strKey)] = convertLuaValue(value)
+		}
+	})
+	return result
 }
