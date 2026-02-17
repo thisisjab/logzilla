@@ -1,22 +1,24 @@
 package processor
 
 import (
+	"strings"
+
 	"github.com/thisisjab/logzilla/entity"
 )
 
 func parseLevel(level string) entity.LogLevel {
-	switch level {
-	case "DEBUG":
+	switch strings.ToLower(level) {
+	case "debug":
 		return entity.LogLevelDebug
-	case "INFO":
+	case "info":
 		return entity.LogLevelInfo
-	case "WARN":
+	case "warn":
 		return entity.LogLevelWarn
-	case "ERROR":
+	case "error":
 		return entity.LogLevelError
-	case "FATAL":
+	case "fatal":
 		return entity.LogLevelFatal
 	default:
-		return entity.LogLevelInfo
+		return entity.LogLevelUnknown
 	}
 }
