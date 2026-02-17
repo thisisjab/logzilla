@@ -24,6 +24,10 @@ type JsonLogProcessor struct {
 
 // NewJsonLogProcessor creates a new instance of JsonLogProcessor.
 func NewJsonLogProcessor(cfg JsonLogProcessorConfig) (*JsonLogProcessor, error) {
+	if cfg.Name == "" {
+		return nil, fmt.Errorf("name cannot be empty")
+	}
+
 	return &JsonLogProcessor{cfg: cfg}, nil
 }
 

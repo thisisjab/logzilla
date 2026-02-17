@@ -27,6 +27,14 @@ type FileLogSource struct {
 
 // NewFileLogSource creates a new FileLogSource instance.
 func NewFileLogSource(logger *slog.Logger, cfg FileLogSourceConfig) (*FileLogSource, error) {
+	if cfg.Name == "" {
+		return nil, fmt.Errorf("name cannot be empty")
+	}
+
+	if cfg.FilePath == "" {
+		return nil, fmt.Errorf("file path cannot be empty")
+	}
+
 	return &FileLogSource{
 		logger: logger,
 		cfg:    cfg,

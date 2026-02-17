@@ -29,6 +29,10 @@ type LuaLogProcessor struct {
 }
 
 func NewLuaLogProcessor(cfg LuaLogProcessorConfig) (*LuaLogProcessor, error) {
+	if cfg.Name == "" {
+		return nil, fmt.Errorf("name cannot be empty")
+	}
+
 	pool := &sync.Pool{
 		New: func() any {
 			L := lua.NewState(lua.Options{
