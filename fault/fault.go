@@ -20,6 +20,8 @@ type fault struct {
 	original error
 }
 
+// New creates a fault with the provided code and message.
+// The returned fault has no metadata and no original error set.
 func New(code faultCode, message string) fault {
 	return fault{
 		code:    code,

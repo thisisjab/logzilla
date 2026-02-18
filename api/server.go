@@ -23,6 +23,8 @@ type server struct {
 	logger *slog.Logger
 }
 
+// NewServer creates a new server configured with cfg and instrumented by logger.
+// It validates that cfg.Addr is non-empty and returns an error if the address is not provided.
 func NewServer(cfg Config, logger *slog.Logger) (*server, error) {
 	if cfg.Addr == "" {
 		return nil, errors.New("addr is required, but not provided")

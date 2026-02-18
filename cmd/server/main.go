@@ -10,6 +10,12 @@ import (
 	"github.com/thisisjab/logzilla/api"
 )
 
+// main starts the API server, sets up a JSON slog logger, installs panic recovery,
+// and listens for SIGINT/SIGTERM to trigger a graceful shutdown.
+//
+// It initializes a cancellable context, creates the server bound to localhost:8000,
+// runs the server until the context is cancelled or an error occurs, and exits with
+// status 1 if server creation fails.
 func main() {
 	// Create a context that can be cancelled
 	ctx, cancel := context.WithCancel(context.Background())
