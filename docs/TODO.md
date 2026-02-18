@@ -7,6 +7,16 @@
 
 - [x] Add more sample configuration files and explain all possible values
 
+## Sources
+
+- [ ] Add rotating file source
+- [ ] Add sources that can be used within SDKs
+
+## Processors
+
+- [ ] Add fastjson processor
+- [ ] Add regex processor
+
 ## Engine
 
 - [x] Remove `IsProcessed ` field since we don't need it anymore
