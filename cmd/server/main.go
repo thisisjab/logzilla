@@ -49,6 +49,7 @@ func main() {
 	if err := server.Serve(ctx); err != nil {
 		logger.Error("server error.", "error", err)
 		cancel()
+		os.Exit(1)
 	}
 
 	logger.Info("server stopped.")
