@@ -2,21 +2,9 @@ package api
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 	"net/http"
 )
-
-type CORSConfig struct {
-	TrustedOrigins []string `yaml:"trusted_origins"`
-}
-
-type Config struct {
-	Addr     string     `yaml:"addr"`
-	CertFile string     `yaml:"cert_file"`
-	KeyFile  string     `yaml:"key_file"`
-	CORS     CORSConfig `yaml:"cors"`
-}
 
 type server struct {
 	cfg    Config
@@ -24,8 +12,8 @@ type server struct {
 }
 
 func NewServer(cfg Config, logger *slog.Logger) (*server, error) {
-	if cfg.Addr == "" {
-		return nil, errors.New("addr is required, but not provided")
+	if err := cfg.Validate(); err != nil {
+		return nil, err
 	}
 
 	return &server{
