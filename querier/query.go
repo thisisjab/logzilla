@@ -12,19 +12,49 @@ type Expr interface {
 	exprNode()
 }
 
+// Query defines the parameters for searching and filtering logs.
+// It supports time-based pagination and flexible sorting.
 type Query struct {
+	// Expr is the filtering logic (e.g., "level=error").
 	Expr Expr
+
+	// Sort defines the order of the results. If multiple fields are provided,
+	// they are applied in the order they appear in the slice.
 	Sort []SortField
-	// Below fields are used for time-based pagination.
-	Start  time.Time
-	End    time.Time
-	Limit  int
+
+	// Start defines the beginning of the time range (inclusive).
+	// This field is required for all queries.
+	Start time.Time
+
+	// End defines the end of the time range (exclusive).
+	// If End is before Start, the query is executed in backward chronological order.
+	End time.Time
+
+	// Limit specifies the maximum number of records to return.
+	// Must be between 1 and 1000.
+	Limit int
+
+	// Cursor is an opaque string used to resume a search from a specific point.
+	// When provided, it overrides the starting point of the search.
 	Cursor string
 }
 
+// SortField defines a single sorting criterion.
 type SortField struct {
-	Name         string
+	// Name is the field to sort by (e.g., "timestamp", "severity").
+	Name string
+	// IsDescending specifies if the sort should be in reverse order.
 	IsDescending bool
+}
+
+// GetQueryDirection determines the temporal direction of the search.
+// It returns QueryDirectionBackward if the End timestamp is earlier than the Start,
+// indicating the user is searching "into the past."
+func (r Query) GetQueryDirection() QueryDirection {
+	if !r.End.IsZero() && r.End.Before(r.Start) {
+		return QueryDirectionBackward
+	}
+	return QueryDirectionForward
 }
 
 func (r Query) Validate() error {
@@ -45,14 +75,4 @@ func (r Query) Validate() error {
 	}
 
 	return nil
-}
-
-// GetQueryDirection helps storage implementations to determine if query must be in an ascending order or descending.
-func (r Query) GetQueryDirection() QueryDirection {
-	// If End is before Start, user wants to go backwards in time
-	if !r.End.IsZero() && r.End.Before(r.Start) {
-		return QueryDirectionBackward
-	}
-	// Default to Forward
-	return QueryDirectionForward
 }
