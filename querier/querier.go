@@ -45,8 +45,8 @@ func (r QueryRequest) Validate() error {
 	return nil
 }
 
-// GetSort helps storage implementations to determine if query must be in an ascending order or descending.
-func (r QueryRequest) GetSort() QueryDirection {
+// GetQueryDirection helps storage implementations to determine if query must be in an ascending order or descending.
+func (r QueryRequest) GetQueryDirection() QueryDirection {
 	// If End is before Start, user wants to go backwards in time
 	if !r.End.IsZero() && r.End.Before(r.Start) {
 		return QueryDirectionBackward
