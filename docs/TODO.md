@@ -2,6 +2,7 @@
 
 - [ ] Support for saving unprocessed logs (due to processor failure)
 - [ ] Add job for re-processing failed logs
+- [ ] Introduce WAL to avoid data loss
 
 ## Documentation
 
@@ -11,6 +12,7 @@
 
 - [ ] Add rotating file source
 - [ ] Add sources that can be used within SDKs
+- [ ] Introduce labeling
 
 ## Processors
 
