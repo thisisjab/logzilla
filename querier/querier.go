@@ -9,11 +9,11 @@ import (
 	"github.com/thisisjab/logzilla/fault"
 )
 
-type queryDirection string
+type QueryDirection string
 
 const (
-	QueryDirectionForward  queryDirection = "forward"
-	QueryDirectionBackward queryDirection = "backward"
+	QueryDirectionForward  QueryDirection = "forward"
+	QueryDirectionBackward QueryDirection = "backward"
 )
 
 type QueryRequest struct {
@@ -46,7 +46,7 @@ func (r QueryRequest) Validate() error {
 }
 
 // GetSort helps storage implementations to determine if query must be in an ascending order or descending.
-func (r QueryRequest) GetSort() queryDirection {
+func (r QueryRequest) GetSort() QueryDirection {
 	// If End is before Start, user wants to go backwards in time
 	if !r.End.IsZero() && r.End.Before(r.Start) {
 		return QueryDirectionBackward
