@@ -18,7 +18,7 @@ const (
 
 type QueryRequest struct {
 	Query Query
-	// Below fields are used time-based pagination
+	// Below fields are used for time-based pagination.
 	Start  time.Time
 	End    time.Time
 	Limit  int
@@ -26,7 +26,7 @@ type QueryRequest struct {
 }
 
 func (r QueryRequest) Validate() error {
-	// MAYBE: In future we may wanna read these from configs
+	// MAYBE: In future we may want to read these from configs.
 	const LimitMin = 1
 	const LimitMax = 1000
 
