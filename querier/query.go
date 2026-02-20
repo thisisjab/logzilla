@@ -1,10 +1,8 @@
 package querier
 
 type Query struct {
-	Expr   Expr
-	Limit  int
-	Offset int
-	Sort   []SortField
+	Expr Expr
+	Sort []SortField
 }
 
 type SortField struct {
