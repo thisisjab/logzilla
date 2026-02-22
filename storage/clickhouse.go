@@ -234,7 +234,7 @@ func (s *ClickHouseStorage) buildOrderByClause(start, end time.Time, sortFields 
 	// Determine the chronological direction based on the comment:
 	// "If End is before Start, the query is executed in backward chronological order."
 	timeDirection := "ASC"
-	if end.Before(start) {
+	if !end.IsZero() && end.Before(start) {
 		timeDirection = "DESC"
 	}
 
@@ -280,9 +280,24 @@ func (s *ClickHouseStorage) buildWhereClause(root querier.QueryNode, start, end 
 		return "", nil, err
 	}
 
+	var sTime, eTime time.Time
+
+	if start.Compare(end) < 0 {
+		sTime = start
+		eTime = end
+	} else {
+		sTime = end
+		eTime = start
+	}
+
 	// Always add timestamp bounds
-	parts := []string{"timestamp <= ? AND timestamp >= ?"}
-	finalArgs := []any{start, end}
+	parts := []string{"timestamp >= ?"}
+	finalArgs := []any{sTime}
+
+	if !eTime.IsZero() {
+		parts = append(parts, "timestamp <= ?")
+		finalArgs = append(finalArgs, eTime)
+	}
 
 	// Add query conditions if they exist
 	if q != "" {
