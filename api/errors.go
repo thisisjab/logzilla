@@ -48,7 +48,7 @@ func (s *server) handleError(w http.ResponseWriter, r *http.Request, err error) 
 			if m == "" {
 				m = "Permission denied."
 			}
-			s.writeError(w, r, http.StatusNotFound, apiResponse{Success: false, Message: m})
+			s.writeError(w, r, http.StatusForbidden, apiResponse{Success: false, Message: m})
 
 		default:
 			s.internalServerError(w, r, f)
