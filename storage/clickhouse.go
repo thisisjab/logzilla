@@ -21,6 +21,7 @@ type ClickHouseStorageConfig struct {
 	Password string   `yaml:"password"`
 }
 
+// TODO: add support for printing generated/executed queries (both for insert and select)
 type ClickHouseStorage struct {
 	conn clickhouse.Conn
 	cfg  ClickHouseStorageConfig
@@ -223,8 +224,6 @@ func (s *ClickHouseStorage) buildQuery(q querier.Query) (string, []any, error) {
 			%s
 			%s
 		`, whereClause, orderByClause, limitClause)
-
-	fmt.Printf("\n****\n Final Query: %s \n Args: %+v \n****\n", sqlQuery, args)
 
 	return sqlQuery, args, nil
 }
