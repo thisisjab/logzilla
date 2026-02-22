@@ -4,21 +4,29 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
+
+	"github.com/thisisjab/logzilla/querier"
 )
 
-type server struct {
-	cfg    Config
-	logger *slog.Logger
+type services struct {
+	storage querier.Querier
 }
 
-func NewServer(cfg Config, logger *slog.Logger) (*server, error) {
+type server struct {
+	cfg      Config
+	services services
+	logger   *slog.Logger
+}
+
+func NewServer(cfg Config, queryable querier.Querier, logger *slog.Logger) (*server, error) {
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
 
 	return &server{
-		cfg:    cfg,
-		logger: logger,
+		cfg:      cfg,
+		services: services{queryable},
+		logger:   logger,
 	}, nil
 }
 
@@ -26,6 +34,9 @@ func (s *server) routes() http.Handler {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /api/healthcheck", s.healthCheckHandler)
+
+	// Fetching logs and sources
+	mux.HandleFunc("POST /api/logs/search", s.searchLogsHandler)
 
 	return s.recoverPanicMiddleware(s.requestLoggerMiddleware(s.corsMiddleware(mux)))
 }
