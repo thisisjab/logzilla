@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
@@ -13,6 +14,8 @@ import (
 	"github.com/thisisjab/logzilla/entity"
 	"github.com/thisisjab/logzilla/querier"
 )
+
+var allowedFieldsRegex = regexp.MustCompile(`^(id|level|timestamp|message|source|metadata(\.("[^"]+"|[a-zA-Z0-9_]+))?)$`)
 
 type ClickHouseStorageConfig struct {
 	Addr     []string `yaml:"addr"`
@@ -381,6 +384,11 @@ func (s *ClickHouseStorage) joinNodes(children []querier.QueryNode, operator str
 func (s *ClickHouseStorage) formatComparison(n querier.ComparisonNode) (string, []any, error) {
 	if n.FieldName == "" || n.Value == nil {
 		return "", nil, fmt.Errorf("invalid comparison node: missing field name or value")
+	}
+
+	// Prevent SQL injection
+	if !allowedFieldsRegex.MatchString(n.FieldName) {
+		return "", nil, fmt.Errorf("invalid field name: %s", n.FieldName)
 	}
 
 	args := make([]any, 1)
