@@ -8,6 +8,7 @@ import (
 	"syscall"
 
 	"github.com/thisisjab/logzilla/api"
+	"github.com/thisisjab/logzilla/storage"
 )
 
 func main() {
@@ -35,10 +36,26 @@ func main() {
 		cancel()
 	}()
 
+	// FIXME: create this based on config
+	db, err := storage.NewClickHouseStorage(storage.ClickHouseStorageConfig{
+		Addr:     []string{"localhost:8000"},
+		Database: "logzilla",
+		Username: "logzilla",
+		Password: "logzilla",
+	})
+	if err != nil {
+		logger.Error("cannot create database.", "error", err)
+		os.Exit(1)
+	}
+
 	// Create server
-	server, err := api.NewServer(api.Config{
-		Addr: "localhost:8000",
-	}, logger)
+	server, err := api.NewServer(
+		api.Config{
+			Addr: "localhost:8000",
+		},
+		db,
+		logger,
+	)
 
 	if err != nil {
 		logger.Error("server error.", "error", err)

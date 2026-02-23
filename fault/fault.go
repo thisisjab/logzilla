@@ -13,49 +13,49 @@ const (
 
 type FieldErrorsMetadata map[string][]string
 
-type fault struct {
+type Fault struct {
 	code     faultCode
 	message  string
 	metadata any
 	original error
 }
 
-func New(code faultCode, message string) fault {
-	return fault{
+func New(code faultCode, message string) Fault {
+	return Fault{
 		code:    code,
 		message: message,
 	}
 }
 
-func (f fault) WithMetadata(metadata any) fault {
+func (f Fault) WithMetadata(metadata any) Fault {
 	e := f
 	e.metadata = metadata
 	return e
 }
 
-func (f fault) WithOriginal(original error) fault {
+func (f Fault) WithOriginal(original error) Fault {
 	e := f
 	e.original = original
 	return e
 }
 
-func (f fault) Code() faultCode {
+func (f Fault) Code() faultCode {
 	return f.code
 }
 
-func (f fault) Message() string {
+func (f Fault) Message() string {
 	return f.message
 }
 
-func (f fault) Metadata() any {
+func (f Fault) Metadata() any {
 	return f.metadata
 }
 
-func (f fault) Original() error {
+func (f Fault) Original() error {
 	return f.original
 }
 
-func (f fault) Error() string {
+func (f Fault) Error() string {
 	if f.original != nil {
 		return fmt.Sprintf("%s: %v", f.message, f.original)
 	}

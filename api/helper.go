@@ -14,7 +14,7 @@ import (
 type apiResponse struct {
 	Success  bool           `json:"success"`
 	Message  string         `json:"message,omitempty"`
-	Data     map[string]any `json:"data,omitempty"`
+	Data     any            `json:"data,omitempty"`
 	Metadata map[string]any `json:"metadata,omitempty"`
 }
 
@@ -95,4 +95,13 @@ func (s *server) writeJson(w http.ResponseWriter, status int, data apiResponse, 
 	w.Write(js) //nolint:errcheck
 
 	return nil
+}
+
+func (s *server) returnOnError(w http.ResponseWriter, r *http.Request, err error) bool {
+	if err != nil {
+		s.handleError(w, r, err)
+		return true
+	}
+
+	return false
 }
