@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"regexp"
-	"slices"
-	"strings"
 	"time"
 
 	"github.com/ClickHouse/clickhouse-go/v2"
@@ -26,12 +24,23 @@ type ClickHouseStorageConfig struct {
 
 // TODO: add support for printing generated/executed queries (both for insert and select)
 type ClickHouseStorage struct {
-	conn clickhouse.Conn
-	cfg  ClickHouseStorageConfig
+	conn  clickhouse.Conn
+	cfg   ClickHouseStorageConfig
+	query *querier.SQLQueryBuilder
 }
 
 func NewClickHouseStorage(cfg ClickHouseStorageConfig) (*ClickHouseStorage, error) {
-	return &ClickHouseStorage{cfg: cfg}, nil
+	queryBuilder := querier.NewSQLQueryBuilder(querier.SQLOptions{
+		TableName:                "processed_logs",
+		SelectColumns:            []string{"id", "source", "timestamp", "level", "message", "metadata"},
+		AllowedSortFields:        []string{"source", "level", "timestamp"},
+		AllowedFilterFieldsRegex: allowedFieldsRegex,
+	})
+
+	return &ClickHouseStorage{
+		cfg:   cfg,
+		query: queryBuilder,
+	}, nil
 }
 
 func setupClickHouseTables(ctx context.Context, conn driver.Conn) error {
@@ -178,14 +187,14 @@ func (s *ClickHouseStorage) Query(ctx context.Context, req querier.QueryRequest)
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	// Build WHERE clause, ORDER BY, and LIMIT clauses from expression tree
-	queryClause, args, err := s.buildQuery(req.Query)
+	// Build the SQL query using the generic query builder
+	result, err := s.query.Build(req.Query)
 	if err != nil {
-		return querier.QueryResponse{}, fmt.Errorf("failed to build where clause: %w", err)
+		return querier.QueryResponse{}, fmt.Errorf("failed to build query: %w", err)
 	}
 
 	// Execute the query
-	rows, err := s.conn.Query(ctx, queryClause, args...)
+	rows, err := s.conn.Query(ctx, result.Query, result.Args...)
 	if err != nil {
 		return querier.QueryResponse{}, fmt.Errorf("failed to execute query: %w", err)
 	}
@@ -201,224 +210,6 @@ func (s *ClickHouseStorage) Query(ctx context.Context, req querier.QueryRequest)
 		Records: records,
 		Cursor:  "", // TODO: Implement cursor-based pagination
 	}, nil
-}
-
-func (s *ClickHouseStorage) buildQuery(q querier.Query) (string, []any, error) {
-	// build WHERE clause from expression tree
-	whereClause, args, err := s.buildWhereClause(q.Node, q.Start, q.End, uuid.UUID{})
-	if err != nil {
-		return "", nil, fmt.Errorf("failed to build where clause: %w", err)
-	}
-
-	// Build ORDER BY clause
-	orderByClause, err := s.buildOrderByClause(q.Start, q.End, q.Sort)
-	if err != nil {
-		return "", nil, fmt.Errorf("cannot build query (order clause): %w", err)
-	}
-
-	// Build LIMIT clause
-	limitClause := fmt.Sprintf("LIMIT %d", q.Limit)
-
-	// Construct the full SQL query
-	sqlQuery := fmt.Sprintf(`
-			SELECT id, source, timestamp, level, message, metadata
-			FROM processed_logs
-			WHERE %s
-			%s
-			%s
-		`, whereClause, orderByClause, limitClause)
-
-	return sqlQuery, args, nil
-}
-
-// buildOrderByClause determines the sort order based on custom fields
-// and the relationship between Start and End timestamps.
-func (s *ClickHouseStorage) buildOrderByClause(start, end time.Time, sortFields []querier.SortField) (string, error) {
-	// Determine the chronological direction based on the comment:
-	// "If End is before Start, the query is executed in backward chronological order."
-	timeDirection := "ASC"
-	if !end.IsZero() && end.Before(start) {
-		timeDirection = "DESC"
-	}
-
-	// Define allowed fields for security/validation
-	allowedFields := []string{"source", "level", "timestamp"}
-
-	// Handle the case where no specific sort fields are requested
-	if len(sortFields) == 0 {
-		return fmt.Sprintf("ORDER BY timestamp %s", timeDirection), nil
-	}
-
-	// Validate and build custom sort parts
-	var parts []string
-	for _, field := range sortFields {
-		if !slices.Contains(allowedFields, field.Name) {
-			return "", fmt.Errorf("field `%s` is not allowed for sorting", field.Name)
-		}
-
-		direction := "ASC"
-		if field.IsDescending {
-			direction = "DESC"
-		}
-
-		parts = append(parts, fmt.Sprintf("%s %s", field.Name, direction))
-	}
-
-	// Ensure timestamp is included in the sort to respect the Start/End logic
-	// if it wasn't already explicitly provided in sortFields.
-	hasTimestamp := slices.ContainsFunc(sortFields, func(f querier.SortField) bool {
-		return f.Name == "timestamp"
-	})
-
-	if !hasTimestamp {
-		parts = append(parts, fmt.Sprintf("timestamp %s", timeDirection))
-	}
-
-	return fmt.Sprintf("ORDER BY %s", strings.Join(parts, ", ")), nil
-}
-
-func (s *ClickHouseStorage) buildWhereClause(root querier.QueryNode, start, end time.Time, skipID uuid.UUID) (string, []any, error) {
-	q, args, err := s.parseQueryNode(root)
-	if err != nil {
-		return "", nil, err
-	}
-
-	var sTime, eTime time.Time
-
-	if start.Compare(end) < 0 {
-		sTime = start
-		eTime = end
-	} else {
-		sTime = end
-		eTime = start
-	}
-
-	// Always add timestamp bounds
-	parts := []string{"timestamp >= ?"}
-	finalArgs := []any{sTime}
-
-	if !eTime.IsZero() {
-		parts = append(parts, "timestamp <= ?")
-		finalArgs = append(finalArgs, eTime)
-	}
-
-	// Add query conditions if they exist
-	if q != "" {
-		parts = append(parts, q)
-		finalArgs = append(finalArgs, args...)
-	}
-
-	return strings.Join(parts, " AND "), finalArgs, nil
-}
-
-func (s *ClickHouseStorage) parseQueryNode(node querier.QueryNode) (string, []any, error) {
-	if node == nil {
-		return "", nil, nil
-	}
-
-	// args is used to collect the arguments for the query parameters
-	var args []any
-
-	switch n := node.(type) {
-	case querier.AndNode:
-		// Join all children with AND. If there are no children,
-		// we return an empty string or a truthy expression like (1=1).
-		return s.joinNodes(n.Children, "AND", args)
-
-	case querier.OrNode:
-		// Join all children with OR.
-		return s.joinNodes(n.Children, "OR", args)
-
-	case querier.NotNode:
-		// Recurse into the single child and wrap with NOT.
-		childQuery, args, err := s.parseQueryNode(n.Child)
-
-		if err != nil {
-			return "", nil, err
-		}
-
-		if childQuery == "" {
-			return "", nil, nil
-		}
-
-		return fmt.Sprintf("NOT (%s)", childQuery), args, nil
-
-	case querier.ComparisonNode:
-		// This is a leaf node. We stop recursing here and
-		// convert the specific comparison into ClickHouse SQL.
-		return s.formatComparison(n)
-
-	default:
-		return "", nil, fmt.Errorf("unknown query node type: %T", node)
-	}
-}
-
-// joinNodes is a helper to handle the recursion for logical groups.
-func (s *ClickHouseStorage) joinNodes(children []querier.QueryNode, operator string, args []any) (string, []any, error) {
-	if len(children) == 0 {
-		return "", nil, nil
-	}
-
-	var parts []string
-	for _, child := range children {
-		query, qArgs, err := s.parseQueryNode(child) // Recursive call
-		if err != nil {
-			return "", nil, err
-		}
-		if query != "" {
-			parts = append(parts, query)
-			args = append(args, qArgs...)
-		}
-	}
-
-	if len(parts) == 0 {
-		return "", nil, nil
-	}
-
-	// Wrap in parentheses to ensure correct mathematical precedence
-	// when ClickHouse evaluates the full string.
-	return fmt.Sprintf("(%s)", strings.Join(parts, fmt.Sprintf(" %s ", operator))), args, nil
-}
-
-// formatComparison is a helper to handle the recursion for logical groups.
-func (s *ClickHouseStorage) formatComparison(n querier.ComparisonNode) (string, []any, error) {
-	if n.FieldName == "" || n.Value == nil {
-		return "", nil, fmt.Errorf("invalid comparison node: missing field name or value")
-	}
-
-	// Prevent SQL injection
-	if !allowedFieldsRegex.MatchString(n.FieldName) {
-		return "", nil, fmt.Errorf("invalid field name: %s", n.FieldName)
-	}
-
-	args := make([]any, 1)
-	args[0] = n.Value
-
-	op := ""
-	switch n.Operator {
-	case querier.OperatorEq:
-		op = "="
-	case querier.OperatorNe:
-		op = "!="
-	case querier.OperatorGt:
-		op = ">"
-	case querier.OperatorLt:
-		op = "<"
-	case querier.OperatorGte:
-		op = ">="
-	case querier.OperatorLte:
-		op = "<="
-	case querier.OperatorLike:
-		op = "LIKE"
-	case querier.OperatorILike:
-		op = "ILIKE"
-	case querier.OperatorIn:
-		op = "IN"
-	default:
-		return "", nil, fmt.Errorf("unsupported operator: %v", n.Operator)
-	}
-
-	return fmt.Sprintf("%s %s ?", n.FieldName, op), args, nil
 }
 
 func scanLogRecords(rows driver.Rows) ([]entity.LogRecord, error) {
