@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/thisisjab/logzilla/querier/ast"
 )
 
 // SQLOptions holds configuration for the SQL query builder.
@@ -49,7 +50,7 @@ type BuildResult struct {
 }
 
 // Build builds a complete SELECT query from the given Query parameters.
-func (b *SQLQueryBuilder) Build(q Query) (BuildResult, error) {
+func (b *SQLQueryBuilder) Build(q ast.Query) (BuildResult, error) {
 	whereClause, args, err := b.buildWhereClause(q.Node, q.Start, q.End, uuid.UUID{})
 	if err != nil {
 		return BuildResult{}, fmt.Errorf("failed to build where clause: %w", err)
@@ -80,7 +81,7 @@ func (b *SQLQueryBuilder) Build(q Query) (BuildResult, error) {
 }
 
 // buildWhereClause constructs the WHERE clause with timestamp bounds and query conditions.
-func (b *SQLQueryBuilder) buildWhereClause(root QueryNode, start, end time.Time, skipID uuid.UUID) (string, []any, error) {
+func (b *SQLQueryBuilder) buildWhereClause(root ast.QueryNode, start, end time.Time, skipID uuid.UUID) (string, []any, error) {
 	queryClause, args, err := b.parseQueryNode(root)
 	if err != nil {
 		return "", nil, err
@@ -116,7 +117,7 @@ func (b *SQLQueryBuilder) buildWhereClause(root QueryNode, start, end time.Time,
 
 // buildOrderByClause determines the sort order based on custom fields
 // and the relationship between Start and End timestamps.
-func (b *SQLQueryBuilder) buildOrderByClause(start, end time.Time, sortFields []SortField) (string, error) {
+func (b *SQLQueryBuilder) buildOrderByClause(start, end time.Time, sortFields []ast.SortField) (string, error) {
 	// Determine the chronological direction based on the comment:
 	// "If End is before Start, the query is executed in backward chronological order."
 	timeDirection := "ASC"
@@ -152,7 +153,7 @@ func (b *SQLQueryBuilder) buildOrderByClause(start, end time.Time, sortFields []
 
 	// Ensure timestamp is included in the sort to respect the Start/End logic
 	// if it wasn't already explicitly provided in sortFields.
-	hasTimestamp := slices.ContainsFunc(sortFields, func(f SortField) bool {
+	hasTimestamp := slices.ContainsFunc(sortFields, func(f ast.SortField) bool {
 		return f.Name == "timestamp"
 	})
 
@@ -164,7 +165,7 @@ func (b *SQLQueryBuilder) buildOrderByClause(start, end time.Time, sortFields []
 }
 
 // parseQueryNode recursively traverses the query tree and generates SQL.
-func (b *SQLQueryBuilder) parseQueryNode(node QueryNode) (string, []any, error) {
+func (b *SQLQueryBuilder) parseQueryNode(node ast.QueryNode) (string, []any, error) {
 	if node == nil {
 		return "", nil, nil
 	}
@@ -173,16 +174,16 @@ func (b *SQLQueryBuilder) parseQueryNode(node QueryNode) (string, []any, error) 
 	var args []any
 
 	switch n := node.(type) {
-	case AndNode:
+	case ast.AndNode:
 		// Join all children with AND. If there are no children,
 		// we return an empty string or a truthy expression like (1=1).
 		return b.joinNodes(n.Children, "AND", args)
 
-	case OrNode:
+	case ast.OrNode:
 		// Join all children with OR.
 		return b.joinNodes(n.Children, "OR", args)
 
-	case NotNode:
+	case ast.NotNode:
 		// Recurse into the single child and wrap with NOT.
 		childQuery, args, err := b.parseQueryNode(n.Child)
 
@@ -196,7 +197,7 @@ func (b *SQLQueryBuilder) parseQueryNode(node QueryNode) (string, []any, error) 
 
 		return fmt.Sprintf("NOT (%s)", childQuery), args, nil
 
-	case ComparisonNode:
+	case ast.ComparisonNode:
 		// This is a leaf node. We stop recursing here and
 		// convert the specific comparison into SQL.
 		return b.formatComparison(n)
@@ -207,7 +208,7 @@ func (b *SQLQueryBuilder) parseQueryNode(node QueryNode) (string, []any, error) 
 }
 
 // joinNodes is a helper to handle the recursion for logical groups.
-func (b *SQLQueryBuilder) joinNodes(children []QueryNode, operator string, args []any) (string, []any, error) {
+func (b *SQLQueryBuilder) joinNodes(children []ast.QueryNode, operator string, args []any) (string, []any, error) {
 	if len(children) == 0 {
 		return "", nil, nil
 	}
@@ -234,7 +235,7 @@ func (b *SQLQueryBuilder) joinNodes(children []QueryNode, operator string, args 
 }
 
 // formatComparison converts a ComparisonNode into SQL.
-func (b *SQLQueryBuilder) formatComparison(n ComparisonNode) (string, []any, error) {
+func (b *SQLQueryBuilder) formatComparison(n ast.ComparisonNode) (string, []any, error) {
 	if n.FieldName == "" || n.Value == nil {
 		return "", nil, fmt.Errorf("invalid comparison node: missing field name or value")
 	}
@@ -249,23 +250,23 @@ func (b *SQLQueryBuilder) formatComparison(n ComparisonNode) (string, []any, err
 
 	op := ""
 	switch n.Operator {
-	case OperatorEq:
+	case ast.OperatorEq:
 		op = "="
-	case OperatorNe:
+	case ast.OperatorNe:
 		op = "!="
-	case OperatorGt:
+	case ast.OperatorGt:
 		op = ">"
-	case OperatorLt:
+	case ast.OperatorLt:
 		op = "<"
-	case OperatorGte:
+	case ast.OperatorGte:
 		op = ">="
-	case OperatorLte:
+	case ast.OperatorLte:
 		op = "<="
-	case OperatorLike:
+	case ast.OperatorLike:
 		op = "LIKE"
-	case OperatorILike:
+	case ast.OperatorILike:
 		op = "ILIKE"
-	case OperatorIn:
+	case ast.OperatorIn:
 		op = "IN"
 	default:
 		return "", nil, fmt.Errorf("unsupported operator: %v", n.Operator)
