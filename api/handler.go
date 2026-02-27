@@ -4,13 +4,14 @@ import (
 	"net/http"
 
 	"github.com/thisisjab/logzilla/querier"
+	"github.com/thisisjab/logzilla/querier/ast"
 )
 
 func (s *server) searchLogsHandler(w http.ResponseWriter, r *http.Request) {
 	// TODO: add documentation
 
 	// Reading query object from request
-	var logQuery querier.Query
+	var logQuery ast.Query
 	if s.returnOnError(w, r, s.readJson(w, r, &logQuery)) {
 		return
 	}
