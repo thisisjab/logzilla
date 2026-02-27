@@ -10,6 +10,9 @@ const (
 	DECIMAL
 	STRING
 	KEYWORD
+	NULL
+	TRUE
+	FALSE
 
 	// Delimiters
 	COMMA
@@ -24,6 +27,7 @@ const (
 	GREATER
 	GREATEREQUAL
 	TILDE
+	MINUS
 	AND
 	OR
 	NOT
