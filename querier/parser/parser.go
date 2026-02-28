@@ -14,6 +14,7 @@ type Parser struct {
 	l         *lexer.Lexer
 	curToken  token.Token
 	peekToken token.Token
+	errors    []error
 }
 
 func New(l *lexer.Lexer) *Parser {
@@ -76,13 +77,13 @@ func (p *Parser) parseControlStatement(q *ast.Query) {
 
 func (p *Parser) parseTimestamp(q *ast.Query) {
 	if p.peekToken.Type != token.EQUAL {
-		panic("this is not ok. only = comes after timestamp")
+		p.addPeekError(token.EQUAL)
 	}
 
 	p.nextToken()
 
 	if p.peekToken.Type != token.STRING {
-		panic("this is not ok. only string comes after =")
+		p.addPeekError(token.STRING)
 	}
 
 	p.nextToken()
@@ -102,7 +103,7 @@ func (p *Parser) parseTimestamp(q *ast.Query) {
 	p.nextToken()
 
 	if p.peekToken.Type != token.STRING {
-		panic("this is not ok. only string comes after ,")
+		p.addPeekError(token.STRING)
 	}
 
 	p.nextToken()
@@ -141,20 +142,20 @@ func parseDatetime(v string) (time.Time, error) {
 
 func (p *Parser) parseLimit(q *ast.Query) {
 	if p.peekToken.Type != token.EQUAL {
-		panic("this is not ok. only = comes after limit")
+		p.addPeekError(token.EQUAL)
 	}
 
 	p.nextToken()
 
 	if p.peekToken.Type != token.INT {
-		panic("this is not ok. only int comes after =")
+		p.addPeekError(token.INT)
 	}
 
 	p.nextToken()
 
 	limit, err := strconv.Atoi(p.curToken.Literal)
 	if err != nil {
-		panic(err)
+		p.addError(fmt.Errorf("cannot parse limit value: `%s` is not a valid integer.", p.curToken.Literal))
 	}
 
 	q.Limit = limit
@@ -164,13 +165,13 @@ func (p *Parser) parseLimit(q *ast.Query) {
 
 func (p *Parser) parseCursor(q *ast.Query) {
 	if p.peekToken.Type != token.EQUAL {
-		panic("this is not ok. only = comes after cursor")
+		p.addPeekError(token.EQUAL)
 	}
 
 	p.nextToken()
 
 	if p.peekToken.Type != token.STRING {
-		panic(fmt.Errorf("this is not ok. only string comes after = which came %v and %d", p.curToken.Literal, p.curToken.Type))
+		p.addPeekError(token.STRING)
 	}
 
 	p.nextToken()
@@ -180,4 +181,12 @@ func (p *Parser) parseCursor(q *ast.Query) {
 	q.Cursor = cursor
 
 	p.nextToken()
+}
+
+func (p *Parser) addError(err error) {
+	p.errors = append(p.errors, err)
+}
+
+func (p *Parser) addPeekError(expected token.TokenType) {
+	p.addError(fmt.Errorf("expected token of type %v, but got %v (literal=`%s`)", expected, p.peekToken.Type, p.peekToken.Literal))
 }
