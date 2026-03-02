@@ -10,22 +10,47 @@ import (
 	"github.com/thisisjab/logzilla/querier/token"
 )
 
+type (
+	nudParseFn func() ast.QueryNode
+	ledParseFn func(ast.QueryNode) ast.QueryNode
+)
+
 type Parser struct {
 	l         *lexer.Lexer
 	curToken  token.Token
 	peekToken token.Token
 	errors    []error
+
+	nudParseFns map[token.TokenType]nudParseFn
+	ledParseFns map[token.TokenType]ledParseFn
 }
 
 func New(l *lexer.Lexer) *Parser {
 	p := &Parser{
-		l: l,
+		l:           l,
+		errors:      make([]error, 0),
+		nudParseFns: make(map[token.TokenType]nudParseFn),
+		ledParseFns: make(map[token.TokenType]ledParseFn),
 	}
+
+	registerHandlers(p)
 
 	p.nextToken()
 	p.nextToken()
 
 	return p
+}
+
+func registerHandlers(p *Parser) {
+	p.registerNud(token.IDENT, p.parseIdentifier)
+}
+
+func (p *Parser) registerNud(tokenType token.TokenType, fn nudParseFn) {
+	p.nudParseFns[tokenType] = fn
+}
+
+func (p *Parser) registerLed(tokenType token.TokenType, fn ledParseFn) { //nolint:unused
+	p.ledParseFns[tokenType] = fn
 }
 
 func (p *Parser) nextToken() {
@@ -44,8 +69,7 @@ func (p *Parser) ParseQuery() *ast.Query {
 		}
 
 		if isParsingFilterSection {
-			// TODO
-			// p.parseFilterStatement(q)
+			p.parseFilterStatement(q)
 		} else {
 			p.parseControlStatement(q)
 		}
@@ -56,8 +80,19 @@ func (p *Parser) ParseQuery() *ast.Query {
 	return q
 }
 
-func (p *Parser) parseStatement(q *ast.Query) { //nolint:unused
-	// TODO
+func (p *Parser) parseFilterStatement(q *ast.Query) {
+	q.Node = p.parseStatement(LOWEST)
+}
+
+func (p *Parser) parseStatement(precedence int) ast.QueryNode {
+	nud, exists := p.nudParseFns[p.curToken.Type]
+	if !exists {
+		panic(fmt.Errorf("no nud parse function for token type: `%v`", p.curToken.Type))
+	}
+
+	leftExp := nud()
+
+	return leftExp
 }
 
 func (p *Parser) parseControlStatement(q *ast.Query) {
@@ -189,4 +224,8 @@ func (p *Parser) addError(err error) {
 
 func (p *Parser) addPeekError(expected token.TokenType) {
 	p.addError(fmt.Errorf("expected token of type %v, but got %v (literal=`%s`)", expected, p.peekToken.Type, p.peekToken.Literal))
+}
+
+func (p *Parser) parseIdentifier() ast.QueryNode {
+	return ast.AndNode{}
 }
