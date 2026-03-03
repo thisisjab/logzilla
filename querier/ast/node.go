@@ -2,38 +2,40 @@ package ast
 
 import "reflect"
 
-// QueryNode is the interface that all nodes in the query tree must implement.
+// Term is the interface that all nodes in the query tree must implement.
 // It uses a private marker method to ensure only types defined in this
 // package can be used as nodes, creating a controlled "sum type" behavior.
-type QueryNode interface {
-	queryNode()
+type Term interface {
+	term()
 }
 
-// AndNode represents a logical conjunction.
+// AndTerm represents a logical conjunction.
 // It is satisfied only if all of its Children evaluate to true.
 // Drivers should typically join children with a logical "AND".
-type AndNode struct {
-	Children []QueryNode
+type AndTerm struct {
+	Left  Term
+	Right Term
 }
 
-func (n AndNode) queryNode() {}
+func (n AndTerm) term() {}
 
-// OrNode represents a logical disjunction.
+// OrTerm represents a logical disjunction.
 // It is satisfied if at least one of its Children evaluates to true.
 // Drivers should typically join children with a logical "OR".
-type OrNode struct {
-	Children []QueryNode
+type OrTerm struct {
+	Left  Term
+	Right Term
 }
 
-func (n OrNode) queryNode() {}
+func (n OrTerm) term() {}
 
 // NotNode represents a logical negation.
 // It inverts the boolean result of its single Child node.
 type NotNode struct {
-	Child QueryNode
+	Term Term
 }
 
-func (n NotNode) queryNode() {}
+func (n NotNode) term() {}
 
 // ComparisonOperator defines the type of comparison to be performed
 // in an expression (e.g., equality, greater than).
@@ -60,23 +62,22 @@ const (
 	OperatorIn
 )
 
-// ComparisonNode is a leaf node in the query tree.
+// ComparisonTerm is a leaf node in the query tree.
 // It represents a concrete filter expression against a specific field.
-type ComparisonNode struct {
+type ComparisonTerm struct {
 	// FieldName is the identifier for the log field.
 	// This can be a top-level field (e.g., "level") or a
 	// path into the metadata JSON (e.g., "metadata.user_id").
 	FieldName string
 
-	// Value is the literal data to compare against.
-	// Drivers are responsible for handling type casting (e.g., string vs. int).
-	Value any
+	// Values is the data (string, int, float, boolean, or list of these primitive types) to compare against.
+	Values []any
 
 	// Operator defines the relationship between the FieldName and the Value.
 	Operator ComparisonOperator
 }
 
-func (n ComparisonNode) queryNode() {}
+func (n ComparisonTerm) term() {}
 
 func (q *Query) Equal(other *Query) bool {
 	if q == nil || other == nil {
@@ -96,54 +97,41 @@ func (q *Query) Equal(other *Query) bool {
 		return false
 	}
 	for i := range q.Sort {
-		if q.Sort[i] != other.Sort[i] { // Assuming SortField is a simple struct
+		if q.Sort[i] != other.Sort[i] {
 			return false
 		}
 	}
 
 	// 3. The Query Tree (Deep Interface Comparison)
-	return nodesEqual(q.Node, other.Node)
+	return nodesEqual(q.Root, other.Root)
 }
 
-func nodesEqual(a, b QueryNode) bool {
+func nodesEqual(a, b Term) bool {
 	if a == nil || b == nil {
 		return a == b
 	}
 
 	switch nodeA := a.(type) {
-	case *ComparisonNode:
-		nodeB, ok := b.(*ComparisonNode)
+	case *ComparisonTerm:
+		nodeB, ok := b.(*ComparisonTerm)
 		return ok &&
 			nodeA.FieldName == nodeB.FieldName &&
 			nodeA.Operator == nodeB.Operator &&
-			reflect.DeepEqual(nodeA.Value, nodeB.Value)
+			reflect.DeepEqual(nodeA.Values, nodeB.Values)
 
-	case *AndNode:
-		nodeB, ok := b.(*AndNode)
-		return ok && checkChildrenEqual(nodeA.Children, nodeB.Children)
+	case *AndTerm:
+		nodeB, ok := b.(*AndTerm)
+		return ok && nodesEqual(nodeA.Left, nodeB.Left) && nodesEqual(nodeA.Right, nodeB.Right)
 
-	case *OrNode:
-		nodeB, ok := b.(*OrNode)
-		return ok && checkChildrenEqual(nodeA.Children, nodeB.Children)
+	case *OrTerm:
+		nodeB, ok := b.(*OrTerm)
+		return ok && nodesEqual(nodeA.Left, nodeB.Left) && nodesEqual(nodeA.Right, nodeB.Right)
 
 	case *NotNode:
 		nodeB, ok := b.(*NotNode)
-		return ok && nodesEqual(nodeA.Child, nodeB.Child)
+		return ok && nodesEqual(nodeA.Term, nodeB.Term)
 
 	default:
 		return reflect.DeepEqual(a, b)
 	}
-}
-
-// Helper to compare slices of nodes
-func checkChildrenEqual(a, b []QueryNode) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if !nodesEqual(a[i], b[i]) {
-			return false
-		}
-	}
-	return true
 }

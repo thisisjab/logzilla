@@ -11,8 +11,8 @@ import (
 )
 
 type (
-	nudParseFn func() ast.QueryNode
-	ledParseFn func(ast.QueryNode) ast.QueryNode
+	nudParseFn func() ast.Term
+	ledParseFn func(ast.Term) ast.Term
 )
 
 type Parser struct {
@@ -81,10 +81,10 @@ func (p *Parser) ParseQuery() *ast.Query {
 }
 
 func (p *Parser) parseFilterStatement(q *ast.Query) {
-	q.Node = p.parseStatement(LOWEST)
+	q.Root = p.parseStatement(LOWEST)
 }
 
-func (p *Parser) parseStatement(precedence int) ast.QueryNode {
+func (p *Parser) parseStatement(precedence int) ast.Term {
 	nud, exists := p.nudParseFns[p.curToken.Type]
 	if !exists {
 		panic(fmt.Errorf("no nud parse function for token type: `%v`", p.curToken.Type))
@@ -226,6 +226,6 @@ func (p *Parser) addPeekError(expected token.TokenType) {
 	p.addError(fmt.Errorf("expected token of type %v, but got %v (literal=`%s`)", expected, p.peekToken.Type, p.peekToken.Literal))
 }
 
-func (p *Parser) parseIdentifier() ast.QueryNode {
-	return ast.AndNode{}
+func (p *Parser) parseIdentifier() ast.Term {
+	return ast.AndTerm{}
 }

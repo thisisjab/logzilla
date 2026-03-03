@@ -17,7 +17,8 @@ const (
 // Query defines the parameters for searching and filtering logs.
 // It supports time-based pagination and flexible sorting.
 type Query struct {
-	Node QueryNode
+	// Root defines the root node of filter clause tree. Any filter clause must be a single node.
+	Root Term
 
 	// Sort defines the order of the results. If multiple fields are provided,
 	// they are applied in the order they appear in the slice.
