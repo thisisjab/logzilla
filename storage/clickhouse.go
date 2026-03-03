@@ -24,22 +24,13 @@ type ClickHouseStorageConfig struct {
 
 // TODO: add support for printing generated/executed queries (both for insert and select)
 type ClickHouseStorage struct {
-	conn  clickhouse.Conn
-	cfg   ClickHouseStorageConfig
-	query *querier.SQLQueryBuilder
+	conn clickhouse.Conn
+	cfg  ClickHouseStorageConfig
 }
 
 func NewClickHouseStorage(cfg ClickHouseStorageConfig) (*ClickHouseStorage, error) {
-	queryBuilder := querier.NewSQLQueryBuilder(querier.SQLOptions{
-		TableName:                "processed_logs",
-		SelectColumns:            []string{"id", "source", "timestamp", "level", "message", "metadata"},
-		AllowedSortFields:        []string{"source", "level", "timestamp"},
-		AllowedFilterFieldsRegex: allowedFieldsRegex,
-	})
-
 	return &ClickHouseStorage{
-		cfg:   cfg,
-		query: queryBuilder,
+		cfg: cfg,
 	}, nil
 }
 
@@ -184,32 +175,7 @@ func (s *ClickHouseStorage) StoreProcessedLogs(ctx context.Context, logs ...enti
 }
 
 func (s *ClickHouseStorage) Query(ctx context.Context, req querier.QueryRequest) (querier.QueryResponse, error) {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
-	// Build the SQL query using the generic query builder
-	result, err := s.query.Build(req.Query)
-	if err != nil {
-		return querier.QueryResponse{}, fmt.Errorf("failed to build query: %w", err)
-	}
-
-	// Execute the query
-	rows, err := s.conn.Query(ctx, result.Query, result.Args...)
-	if err != nil {
-		return querier.QueryResponse{}, fmt.Errorf("failed to execute query: %w", err)
-	}
-	defer rows.Close()
-
-	// Scan results
-	records, err := scanLogRecords(rows)
-	if err != nil {
-		return querier.QueryResponse{}, fmt.Errorf("failed to scan results: %w", err)
-	}
-
-	return querier.QueryResponse{
-		Records: records,
-		Cursor:  "", // TODO: Implement cursor-based pagination
-	}, nil
+	panic("not implemented")
 }
 
 func scanLogRecords(rows driver.Rows) ([]entity.LogRecord, error) {
