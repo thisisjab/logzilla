@@ -41,6 +41,10 @@ func TestParseControlSectionTimestamp(t *testing.T) {
 			t.Fatalf("ParseQuery(%q)\n%+v,\nwant %+v", input, actual, expected)
 		}
 
+		if len(p.errors) != 0 {
+			t.Fatalf("expected 0 errors, but got: %s", p.errors)
+		}
+
 		if p.curToken.Type != token.EOF {
 			t.Fatalf("Expected EOF token, got %v", p.curToken)
 		}
@@ -67,6 +71,10 @@ func TestParseControlSectionLimit(t *testing.T) {
 		actual := p.ParseQuery()
 		if !actual.Equal(&expected) {
 			t.Fatalf("ParseQuery(%q)\n%+v,\nwant %+v", input, actual, expected)
+		}
+
+		if len(p.errors) != 0 {
+			t.Fatalf("expected 0 errors, but got: %s", p.errors)
 		}
 
 		if p.curToken.Type != token.EOF {
@@ -97,6 +105,10 @@ func TestParseControlSectionCursor(t *testing.T) {
 		actual := p.ParseQuery()
 		if !actual.Equal(&expected) {
 			t.Fatalf("ParseQuery(%q)\n%+v,\nwant %+v", input, actual, expected)
+		}
+
+		if len(p.errors) != 0 {
+			t.Fatalf("expected 0 errors, but got: %s", p.errors)
 		}
 
 		if p.curToken.Type != token.EOF {

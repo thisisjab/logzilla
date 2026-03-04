@@ -3,7 +3,6 @@ package parser
 import (
 	"fmt"
 	"strconv"
-	"time"
 
 	"github.com/thisisjab/logzilla/querier/ast"
 	"github.com/thisisjab/logzilla/querier/lexer"
@@ -117,15 +116,13 @@ func (p *Parser) parseControlStatement(q *ast.Query) {
 }
 
 func (p *Parser) parseTimestamp(q *ast.Query) {
-	if p.peekToken.Type != token.EQUAL {
-		p.addPeekError(token.EQUAL)
+	if !p.peekTokenTypeIs(token.EQUAL) {
 		return
 	}
 
 	p.nextToken()
 
-	if p.peekToken.Type != token.STRING {
-		p.addPeekError(token.STRING)
+	if !p.peekTokenTypeIs(token.STRING) {
 		return
 	}
 
@@ -145,8 +142,7 @@ func (p *Parser) parseTimestamp(q *ast.Query) {
 
 	p.nextToken()
 
-	if p.peekToken.Type != token.STRING {
-		p.addPeekError(token.STRING)
+	if !p.peekTokenTypeIs(token.STRING) {
 		return
 	}
 
@@ -162,38 +158,14 @@ func (p *Parser) parseTimestamp(q *ast.Query) {
 	p.nextToken()
 }
 
-func parseDatetime(v string) (time.Time, error) {
-	layouts := []string{
-		time.RFC3339,          // Handles 2000-10-10T12:20:23Z or with offsets
-		"2006-01-02T15:04:05", // 2000-10-10T12:20:23
-		"2006-01-02T15:04",    // 2000-10-10T12:20
-		"2006-01-02",          // 2000-10-10
-	}
-
-	var t time.Time
-	var err error
-
-	for _, layout := range layouts {
-		t, err = time.Parse(layout, v)
-		if err == nil {
-			return t, nil
-		}
-	}
-
-	// If no layouts matched, return the last error or a custom one
-	return time.Time{}, fmt.Errorf("failed to parse datetime '%s': %w", v, err)
-}
-
 func (p *Parser) parseLimit(q *ast.Query) {
-	if p.peekToken.Type != token.EQUAL {
-		p.addPeekError(token.EQUAL)
+	if !p.peekTokenTypeIs(token.EQUAL) {
 		return
 	}
 
 	p.nextToken()
 
-	if p.peekToken.Type != token.INT {
-		p.addPeekError(token.INT)
+	if !p.peekTokenTypeIs(token.INT) {
 		return
 	}
 
@@ -211,15 +183,13 @@ func (p *Parser) parseLimit(q *ast.Query) {
 }
 
 func (p *Parser) parseCursor(q *ast.Query) {
-	if p.peekToken.Type != token.EQUAL {
-		p.addPeekError(token.EQUAL)
+	if !p.peekTokenTypeIs(token.EQUAL) {
 		return
 	}
 
 	p.nextToken()
 
-	if p.peekToken.Type != token.STRING && p.peekToken.Type != token.IDENT {
-		p.addPeekError(token.STRING)
+	if !p.peekTokenTypeIs(token.STRING, token.IDENT) {
 		return
 	}
 
@@ -230,14 +200,6 @@ func (p *Parser) parseCursor(q *ast.Query) {
 	q.Cursor = cursor
 
 	p.nextToken()
-}
-
-func (p *Parser) addError(err error) {
-	p.errors = append(p.errors, err)
-}
-
-func (p *Parser) addPeekError(expected token.TokenType) {
-	p.addError(fmt.Errorf("expected token of type %v, but got %v (literal=`%s`)", expected, p.peekToken.Type, p.peekToken.Literal))
 }
 
 func (p *Parser) parseIdentifier() ast.Term {
