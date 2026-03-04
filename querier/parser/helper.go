@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/thisisjab/logzilla/querier/ast"
 	"github.com/thisisjab/logzilla/querier/token"
 )
 
@@ -52,4 +53,29 @@ func parseDatetime(v string) (time.Time, error) {
 
 	// If no layouts matched, return the last error or a custom one
 	return time.Time{}, fmt.Errorf("failed to parse datetime '%s': %w", v, err)
+}
+
+func (p *Parser) parseSingleSortField() (ast.SortField, error) {
+	s := ast.SortField{}
+
+	switch p.curToken.Type {
+	case token.IDENT, token.STRING:
+		s.Name = p.curToken.Literal
+		s.IsDescending = false
+	case token.MINUS:
+		if !p.peekTokenTypeIs(token.IDENT, token.STRING) {
+			return s, fmt.Errorf("expected a literal after a descending sort field, got `%s`", p.peekToken.Type.String())
+		}
+
+		p.nextToken()
+
+		s.Name = p.curToken.Literal
+		s.IsDescending = true
+	default:
+		return s, fmt.Errorf("unexpected token of type `%s`", p.peekToken.Type.String())
+	}
+
+	p.nextToken()
+
+	return s, nil
 }
