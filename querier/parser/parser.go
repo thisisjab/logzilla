@@ -96,6 +96,12 @@ func (p *Parser) parseStatement(precedence int) ast.Term {
 }
 
 func (p *Parser) parseControlStatement(q *ast.Query) {
+	// TODO: Handle illegal token
+
+	if p.curToken.Type == token.EOF {
+		return
+	}
+
 	switch p.curToken.Literal {
 	case "timestamp":
 		p.parseTimestamp(q)
@@ -113,12 +119,14 @@ func (p *Parser) parseControlStatement(q *ast.Query) {
 func (p *Parser) parseTimestamp(q *ast.Query) {
 	if p.peekToken.Type != token.EQUAL {
 		p.addPeekError(token.EQUAL)
+		return
 	}
 
 	p.nextToken()
 
 	if p.peekToken.Type != token.STRING {
 		p.addPeekError(token.STRING)
+		return
 	}
 
 	p.nextToken()
@@ -139,6 +147,7 @@ func (p *Parser) parseTimestamp(q *ast.Query) {
 
 	if p.peekToken.Type != token.STRING {
 		p.addPeekError(token.STRING)
+		return
 	}
 
 	p.nextToken()
@@ -178,12 +187,14 @@ func parseDatetime(v string) (time.Time, error) {
 func (p *Parser) parseLimit(q *ast.Query) {
 	if p.peekToken.Type != token.EQUAL {
 		p.addPeekError(token.EQUAL)
+		return
 	}
 
 	p.nextToken()
 
 	if p.peekToken.Type != token.INT {
 		p.addPeekError(token.INT)
+		return
 	}
 
 	p.nextToken()
@@ -191,6 +202,7 @@ func (p *Parser) parseLimit(q *ast.Query) {
 	limit, err := strconv.Atoi(p.curToken.Literal)
 	if err != nil {
 		p.addError(fmt.Errorf("cannot parse limit value: `%s` is not a valid integer.", p.curToken.Literal))
+		return
 	}
 
 	q.Limit = limit
@@ -201,12 +213,14 @@ func (p *Parser) parseLimit(q *ast.Query) {
 func (p *Parser) parseCursor(q *ast.Query) {
 	if p.peekToken.Type != token.EQUAL {
 		p.addPeekError(token.EQUAL)
+		return
 	}
 
 	p.nextToken()
 
-	if p.peekToken.Type != token.STRING {
+	if p.peekToken.Type != token.STRING && p.peekToken.Type != token.IDENT {
 		p.addPeekError(token.STRING)
+		return
 	}
 
 	p.nextToken()
