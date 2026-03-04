@@ -17,7 +17,7 @@ func TestParseControlSectionTimestamp(t *testing.T) {
 		"timestamp=2021-04-17": {
 			Start: time.Date(2021, 4, 17, 0, 0, 0, 0, time.UTC),
 		},
-		"timestamp=2021-04-17,2022-03-10": {
+		"timestamp=\"2021-04-17\",2022-03-10": {
 			Start: time.Date(2021, 4, 17, 0, 0, 0, 0, time.UTC),
 			End:   time.Date(2022, 3, 10, 0, 0, 0, 0, time.UTC),
 		},

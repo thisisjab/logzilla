@@ -111,7 +111,8 @@ func (p *Parser) parseControlStatement(q *ast.Query) {
 	case "sort":
 	// TODO
 	default:
-		panic("unexpected token")
+		p.addError(fmt.Errorf("unexpected token of type `%s`", p.curToken.Type.String()))
+		return
 	}
 }
 
@@ -131,12 +132,14 @@ func (p *Parser) parseTimestamp(q *ast.Query) {
 	// Parse start
 	start, err := parseDatetime(p.curToken.Literal)
 	if err != nil {
-		panic(err)
+		p.addError(err)
+		return
 	}
 
 	q.Start = start
 
 	if p.peekToken.Type != token.COMMA {
+		// There's no value for `end`, so let's return
 		return
 	}
 
@@ -150,7 +153,8 @@ func (p *Parser) parseTimestamp(q *ast.Query) {
 
 	end, err := parseDatetime(p.curToken.Literal)
 	if err != nil {
-		panic(err)
+		p.addError(err)
+		return
 	}
 
 	q.End = end
@@ -195,13 +199,7 @@ func (p *Parser) parseCursor(q *ast.Query) {
 
 	p.nextToken()
 
-	cursor := p.curToken.Literal
-
-	q.Cursor = cursor
+	q.Cursor = p.curToken.Literal
 
 	p.nextToken()
-}
-
-func (p *Parser) parseIdentifier() ast.Term {
-	return ast.AndTerm{}
 }
