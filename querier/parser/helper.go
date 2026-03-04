@@ -33,6 +33,10 @@ func (p *Parser) peekTokenTypeIs(expected ...token.TokenType) bool {
 	return false
 }
 
+func (p *Parser) currentTokenTypeIs(expected ...token.TokenType) bool { //nolint:unused
+	return slices.Contains(expected, p.curToken.Type)
+}
+
 func parseDatetime(v string) (time.Time, error) {
 	layouts := []string{
 		time.RFC3339,          // Handles 2000-10-10T12:20:23Z or with offsets
@@ -74,8 +78,6 @@ func (p *Parser) parseSingleSortField() (ast.SortField, error) {
 	default:
 		return s, fmt.Errorf("unexpected token of type `%s`", p.peekToken.Type.String())
 	}
-
-	p.nextToken()
 
 	return s, nil
 }

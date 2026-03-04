@@ -158,8 +158,6 @@ func (p *Parser) parseTimestamp(q *ast.Query) {
 	}
 
 	q.End = end
-
-	p.nextToken()
 }
 
 func (p *Parser) parseLimit(q *ast.Query) {
@@ -182,8 +180,6 @@ func (p *Parser) parseLimit(q *ast.Query) {
 	}
 
 	q.Limit = limit
-
-	p.nextToken()
 }
 
 func (p *Parser) parseCursor(q *ast.Query) {
@@ -200,8 +196,6 @@ func (p *Parser) parseCursor(q *ast.Query) {
 	p.nextToken()
 
 	q.Cursor = p.curToken.Literal
-
-	p.nextToken()
 }
 
 func (p *Parser) parseSort(q *ast.Query) {
@@ -225,8 +219,10 @@ func (p *Parser) parseSort(q *ast.Query) {
 
 		q.Sort = append(q.Sort, f)
 
-		if p.curToken.Type != token.COMMA {
-			break
+		if p.peekToken.Type != token.COMMA {
+			return
 		}
+
+		p.nextToken()
 	}
 }
