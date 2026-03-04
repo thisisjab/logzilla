@@ -3,6 +3,7 @@ package parser
 import (
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -80,4 +81,49 @@ func (p *Parser) parseSingleSortField() (ast.SortField, error) {
 	}
 
 	return s, nil
+}
+
+func (p *Parser) parseValues() []any {
+	values := make([]any, 0)
+
+	for p.currentTokenTypeIs(token.STRING, token.IDENT, token.INT, token.DECIMAL, token.NULL, token.TRUE, token.FALSE) {
+		switch p.curToken.Type {
+		case token.STRING, token.IDENT:
+			values = append(values, p.curToken.Literal)
+
+		case token.INT:
+			num, err := strconv.Atoi(p.curToken.Literal)
+			if err != nil {
+				panic(fmt.Errorf("cannot parse %s to a valid int", p.curToken.Literal))
+			}
+
+			values = append(values, num)
+
+		case token.DECIMAL:
+			num, err := strconv.ParseFloat(p.curToken.Literal, 32)
+			if err != nil {
+				panic(fmt.Errorf("cannot parse %s to a valid decimal", p.curToken.Literal))
+			}
+
+			values = append(values, num)
+
+		case token.TRUE, token.FALSE:
+			values = append(values, p.curToken.Type == token.TRUE)
+
+		case token.NULL:
+			values = append(values, nil)
+
+		default:
+			p.addPeekError(token.STRING, token.IDENT, token.INT, token.DECIMAL, token.NULL, token.TRUE, token.FALSE)
+		}
+
+		if p.peekToken.Type != token.COMMA {
+			return values
+		}
+
+		p.nextToken() // Read comma
+		p.nextToken() // Read next value
+	}
+
+	return values
 }

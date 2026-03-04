@@ -218,3 +218,114 @@ func TestParsingControlSection(t *testing.T) {
 		}
 	}
 }
+
+func TestParseIdentifier(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected ast.ComparisonTerm
+	}{
+		{
+			input: ":level=a,b,c",
+			expected: ast.ComparisonTerm{
+				FieldName: "level",
+				Operator:  ast.OperatorEq,
+				Values:    []any{"a", "b", "c"},
+			},
+		},
+		{
+			input: ":source~1,2,3",
+			expected: ast.ComparisonTerm{
+				FieldName: "source",
+				Operator:  ast.OperatorILike,
+				Values:    []any{1, 2, 3},
+			},
+		},
+		{
+			input: ":source!=1,2,3",
+			expected: ast.ComparisonTerm{
+				FieldName: "source",
+				Operator:  ast.OperatorNe,
+				Values:    []any{1, 2, 3},
+			},
+		},
+		{
+			input: ":level<1",
+			expected: ast.ComparisonTerm{
+				FieldName: "level",
+				Operator:  ast.OperatorLt,
+				Values:    []any{1},
+			},
+		},
+		{
+			input: ":level<=1",
+			expected: ast.ComparisonTerm{
+				FieldName: "level",
+				Operator:  ast.OperatorLte,
+				Values:    []any{1},
+			},
+		},
+		{
+			input: ":level>1",
+			expected: ast.ComparisonTerm{
+				FieldName: "level",
+				Operator:  ast.OperatorGt,
+				Values:    []any{1},
+			},
+		},
+		{
+			input: ":level>=1",
+			expected: ast.ComparisonTerm{
+				FieldName: "level",
+				Operator:  ast.OperatorGte,
+				Values:    []any{1},
+			},
+		},
+	}
+
+	var l *lexer.Lexer
+	var p *Parser
+	for i, tc := range tests {
+		l = lexer.New(tc.input)
+		p = New(l)
+
+		query := p.ParseQuery()
+
+		if query.Root == nil {
+			t.Fatalf("[%d] query has no root node", i)
+		}
+
+		comparison, ok := query.Root.(ast.ComparisonTerm)
+		if !ok {
+			t.Fatalf("[%d] cannot cast result of `parseIdentifier` to `ast.ComparisonTerm`", i)
+		}
+
+		if comparison.FieldName != tc.expected.FieldName {
+			t.Fatalf("[%d] field name mismatch: %s != %s", i, comparison.FieldName, tc.expected.FieldName)
+		}
+
+		if comparison.Operator != tc.expected.Operator {
+			t.Fatalf("[%d] operator mismatch: %s != %s", i, comparison.FieldName, tc.expected.FieldName)
+		}
+
+		if len(comparison.Values) != len(tc.expected.Values) {
+			t.Fatalf("[%d] result and expected have different lengths: %d != %d", i, len(comparison.Values), len(tc.expected.Values))
+		}
+
+		for j := range comparison.Values {
+			if comparison.Values[j] != tc.expected.Values[j] {
+				t.Fatalf("[%d] result and expected have different values at `%d`: `%v` != `%v`", i, j, comparison.Values[j], tc.expected.Values[j])
+			}
+		}
+
+		if len(p.errors) != 0 {
+			t.Fatalf("expected 0 errors, but got: %s", p.errors)
+		}
+
+		p.nextToken()
+
+		if p.curToken.Type != token.EOF {
+			t.Fatalf("Expected EOF token, got %v", p.curToken)
+		}
+
+	}
+}

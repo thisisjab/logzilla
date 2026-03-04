@@ -9,11 +9,6 @@ import (
 	"github.com/thisisjab/logzilla/querier/token"
 )
 
-type (
-	nudParseFn func() ast.Term
-	ledParseFn func(ast.Term) ast.Term
-)
-
 type Parser struct {
 	l         *lexer.Lexer
 	curToken  token.Token
@@ -65,6 +60,7 @@ func (p *Parser) ParseQuery() *ast.Query {
 	for p.curToken.Type != token.EOF {
 		if p.curToken.Type == token.COLON {
 			isParsingFilterSection = true
+			p.nextToken()
 		}
 
 		if isParsingFilterSection {
