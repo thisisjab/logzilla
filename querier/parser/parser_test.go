@@ -11,6 +11,7 @@ import (
 	"github.com/thisisjab/logzilla/querier/token"
 )
 
+// TestParseControlSectionTimestamp tests if timestamp is parsed correctly in isolation.
 func TestParseControlSectionTimestamp(t *testing.T) {
 	tests := map[string]ast.Query{
 		"timestamp=2021-04-17": {
@@ -46,6 +47,7 @@ func TestParseControlSectionTimestamp(t *testing.T) {
 	}
 }
 
+// TestParseControlSectionLimit tests if limit is parsed correctly in isolation.
 func TestParseControlSectionLimit(t *testing.T) {
 	tests := map[string]ast.Query{
 		"limit=100": {
@@ -73,7 +75,8 @@ func TestParseControlSectionLimit(t *testing.T) {
 	}
 }
 
-func TestParseControlSectionOffset(t *testing.T) {
+// TestParseControlSectionCursor tests if cursor is parsed correctly in isolation.
+func TestParseControlSectionCursor(t *testing.T) {
 	testUUID := uuid.New()
 
 	tests := map[string]ast.Query{
