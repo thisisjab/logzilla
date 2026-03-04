@@ -116,3 +116,59 @@ func TestParseControlSectionCursor(t *testing.T) {
 		}
 	}
 }
+
+// TestParseControlSectionSort tests if sort is parsed correctly in isolation.
+func TestParseControlSectionSort(t *testing.T) {
+	tests := map[string]ast.Query{
+		"sort=field1": {
+			Sort: []ast.SortField{{Name: "field1", IsDescending: false}},
+		},
+		"sort=-field1": {
+			Sort: []ast.SortField{{Name: "field1", IsDescending: true}},
+		},
+		"sort=\"field1\"": {
+			Sort: []ast.SortField{{Name: "field1", IsDescending: false}},
+		},
+		"sort=-\"field1\"": {
+			Sort: []ast.SortField{{Name: "field1", IsDescending: true}},
+		},
+		"sort=field1,field2": {
+			Sort: []ast.SortField{{Name: "field1", IsDescending: false}, {Name: "field2", IsDescending: false}},
+		},
+		"sort=field1,-field2": {
+			Sort: []ast.SortField{{Name: "field1", IsDescending: false}, {Name: "field2", IsDescending: true}},
+		},
+		"sort=-field1,field2": {
+			Sort: []ast.SortField{{Name: "field1", IsDescending: true}, {Name: "field2", IsDescending: false}},
+		},
+		"sort=-field1,-field2": {
+			Sort: []ast.SortField{{Name: "field1", IsDescending: true}, {Name: "field2", IsDescending: true}},
+		},
+		"sort=\"field1\",field2": {
+			Sort: []ast.SortField{{Name: "field1", IsDescending: false}, {Name: "field2", IsDescending: false}},
+		},
+		"sort=-\"field1\",field2": {
+			Sort: []ast.SortField{{Name: "field1", IsDescending: true}, {Name: "field2", IsDescending: false}},
+		},
+	}
+
+	var l *lexer.Lexer
+	var p *Parser
+	for input, expected := range tests {
+		l = lexer.New(input)
+		p = New(l)
+
+		actual := p.ParseQuery()
+		if !actual.Equal(&expected) {
+			t.Fatalf("ParseQuery(%q)\ngot:  %+v,\nwant: %+v", input, *actual, expected)
+		}
+
+		if len(p.errors) != 0 {
+			t.Fatalf("expected 0 errors, but got: %s", p.errors)
+		}
+
+		if p.curToken.Type != token.EOF {
+			t.Fatalf("Expected EOF token, got %v", p.curToken)
+		}
+	}
+}

@@ -109,7 +109,7 @@ func (p *Parser) parseControlStatement(q *ast.Query) {
 	case "cursor":
 		p.parseCursor(q)
 	case "sort":
-	// TODO
+		p.parseSort(q)
 	default:
 		p.addError(fmt.Errorf("unexpected token of type `%s`", p.curToken.Type.String()))
 		return
@@ -202,4 +202,31 @@ func (p *Parser) parseCursor(q *ast.Query) {
 	q.Cursor = p.curToken.Literal
 
 	p.nextToken()
+}
+
+func (p *Parser) parseSort(q *ast.Query) {
+	if !p.peekTokenTypeIs(token.EQUAL) {
+		return
+	}
+
+	p.nextToken()
+
+	if q.Sort == nil {
+		q.Sort = make([]ast.SortField, 0)
+	}
+
+	for p.peekTokenTypeIs(token.MINUS, token.IDENT, token.STRING) {
+		p.nextToken()
+
+		f, err := p.parseSingleSortField()
+		if err != nil {
+			return
+		}
+
+		q.Sort = append(q.Sort, f)
+
+		if p.curToken.Type != token.COMMA {
+			break
+		}
+	}
 }
