@@ -9,10 +9,10 @@ import (
 
 type (
 	nudParseFn func() ast.Term
-	ledParseFn func(left ast.Term, bp int) ast.Term
+	ledParseFn func(left ast.Term, precedence int) ast.Term
 )
 
-// parseIdentifier is a function that parses a possible comparison term (i.e. level=info).
+// parseIdentifier is a nud function that parses a possible comparison term (i.e. level=info).
 func (p *Parser) parseIdentifier() ast.Term {
 	n := ast.ComparisonTerm{
 		FieldName: p.curToken.Literal,
@@ -45,4 +45,43 @@ func (p *Parser) parseIdentifier() ast.Term {
 	n.Values = p.parseValues()
 
 	return n
+}
+
+func (p *Parser) parseAndCondition(left ast.Term, precedence int) ast.Term {
+	t := ast.AndTerm{
+		Left: left,
+	}
+
+	p.nextToken()
+
+	t.Right = p.parseStatement(precedence)
+
+	return t
+}
+
+func (p *Parser) parseOrCondition(left ast.Term, precedence int) ast.Term {
+	t := ast.OrTerm{
+		Left: left,
+	}
+
+	p.nextToken()
+
+	t.Right = p.parseStatement(precedence)
+
+	return t
+}
+
+func (p *Parser) parseLParen() ast.Term {
+	p.nextToken()
+
+	exp := p.parseStatement(LOWEST)
+
+	if p.peekToken.Type != token.RPAREN {
+		// TODO: add error handling
+		panic(fmt.Errorf("expected RPAREN, but got %s (%s)", p.peekToken.Literal, p.peekToken.Type))
+	}
+
+	p.nextToken()
+
+	return exp
 }

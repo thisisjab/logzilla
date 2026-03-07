@@ -37,6 +37,10 @@ func New(l *lexer.Lexer) *Parser {
 
 func registerHandlers(p *Parser) {
 	p.registerNud(token.IDENT, p.parseIdentifier)
+	p.registerNud(token.LPAREN, p.parseLParen)
+
+	p.registerLed(token.AND, p.parseAndCondition)
+	p.registerLed(token.OR, p.parseOrCondition)
 }
 
 func (p *Parser) registerNud(tokenType token.TokenType, fn nudParseFn) {
@@ -86,6 +90,16 @@ func (p *Parser) parseStatement(precedence int) ast.Term {
 	}
 
 	leftExp := nud()
+
+	for precedenceMap[p.peekToken.Type] > precedence {
+		p.nextToken()
+		led, exists := p.ledParseFns[p.curToken.Type]
+		if !exists {
+			panic(fmt.Errorf("no led parse function for token type: `%v`", p.curToken.Type))
+		}
+
+		leftExp = led(leftExp, precedence)
+	}
 
 	return leftExp
 }
