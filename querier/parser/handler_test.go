@@ -154,3 +154,43 @@ func TestParseLParen(t *testing.T) {
 		}
 	}
 }
+
+func TestParseNot(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{
+			input:    ":!(level=10)",
+			expected: "!((level = 10))",
+		},
+		{
+			input:    ":(!!(level=10))",
+			expected: "!(!((level = 10)))",
+		},
+		{
+			input:    ":(!level=10) & t!=10",
+			expected: "(!((level = 10)) & (t != 10))",
+		},
+	}
+
+	var l *lexer.Lexer
+	var p *Parser
+	for i, tc := range tests {
+		l = lexer.New(tc.input)
+		p = New(l)
+		result := p.ParseQuery().Root.String()
+
+		if result != tc.expected {
+			t.Fatalf("[%d] expected `%s` after parsing, but got `%s`", i, tc.expected, result)
+		}
+
+		if p.peekToken.Type != token.EOF {
+			t.Fatalf("[%d] expected EOF, but got `%s (%s)`", i, p.curToken.Literal, p.curToken.Type.String())
+		}
+
+		if len(p.errors) != 0 {
+			t.Fatalf("[%d] expected no error, but got %d errors: %+v", i, len(p.errors), p.errors)
+		}
+	}
+}

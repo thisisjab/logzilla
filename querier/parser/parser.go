@@ -38,6 +38,7 @@ func New(l *lexer.Lexer) *Parser {
 func registerHandlers(p *Parser) {
 	p.registerNud(token.IDENT, p.parseIdentifier)
 	p.registerNud(token.LPAREN, p.parseLParen)
+	p.registerNud(token.NOT, p.parseNot)
 
 	p.registerLed(token.AND, p.parseAndCondition)
 	p.registerLed(token.OR, p.parseOrCondition)

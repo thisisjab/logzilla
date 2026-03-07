@@ -85,3 +85,10 @@ func (p *Parser) parseLParen() ast.Term {
 
 	return exp
 }
+
+func (p *Parser) parseNot() ast.Term {
+	p.nextToken()
+	return ast.NotNode{
+		Term: p.parseStatement(LOWEST),
+	}
+}
