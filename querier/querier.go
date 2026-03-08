@@ -17,5 +17,5 @@ type QueryResponse struct {
 }
 
 type Querier interface {
-	Query(ctx context.Context, req QueryRequest) (QueryResponse, error)
+	Query(ctx context.Context, req QueryRequest) (*QueryResponse, error)
 }
