@@ -180,30 +180,10 @@ func (s *ClickHouseStorage) Query(ctx context.Context, req querier.QueryRequest)
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	// To build query we need several steps:
-	// 1) Build where clause considering cursor
-	where, whereArgs, err := s.buildWhereClause(&req.Query)
+	q, args, err := s.constructQuery(req.Query)
 	if err != nil {
-		return nil, fmt.Errorf("cannot query: %w", err)
+		return nil, fmt.Errorf("cannot construct query: %w", err)
 	}
-
-	// 2) Provide sort
-	sort, sortArgs, err := s.buildSortClause(&req.Query)
-	if err != nil {
-		return nil, fmt.Errorf("cannot query: %w", err)
-	}
-
-	// 3) Provide limit
-	limit, limitArgs, err := s.buildLimitClause(&req.Query)
-	if err != nil {
-		return nil, fmt.Errorf("cannot query: %w", err)
-	}
-
-	q := fmt.Sprintf(`SELECT id, source, level, message, timestamp, metadata FROM processed_logs %s %s %s`, where, sort, limit)
-	args := make([]any, 0)
-	args = append(args, whereArgs...)
-	args = append(args, sortArgs...)
-	args = append(args, limitArgs...)
 
 	rows, err := s.conn.Query(ctx, q, args...)
 	if err != nil {
@@ -221,41 +201,40 @@ func (s *ClickHouseStorage) Query(ctx context.Context, req querier.QueryRequest)
 	return &querier.QueryResponse{Records: logs}, nil
 }
 
-func scanLogRecords(rows driver.Rows) ([]entity.LogRecord, error) {
-	var records []entity.LogRecord
-
-	for rows.Next() {
-		var record entity.LogRecord
-		var levelStr string
-
-		err := rows.Scan(
-			&record.ID,
-			&record.Source,
-			&record.Timestamp,
-			&levelStr,
-			&record.Message,
-			&record.Metadata,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan row: %w", err)
-		}
-
-		record.Level = parseLogLevel(levelStr)
-		records = append(records, record)
+func (s *ClickHouseStorage) constructQuery(query ast.Query) (string, []any, error) {
+	// To build query we need several steps:
+	// 1) Build where clause considering cursor
+	where, whereArgs, err := s.buildWhereClause(query)
+	if err != nil {
+		return "", nil, err
 	}
 
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("row iteration error: %w", err)
+	// 2) Provide sort
+	sort, sortArgs, err := s.buildSortClause(query)
+	if err != nil {
+		return "", nil, err
 	}
 
-	return records, nil
+	// 3) Provide limit
+	limit, limitArgs, err := s.buildLimitClause(query)
+	if err != nil {
+		return "", nil, err
+	}
+
+	q := fmt.Sprintf(`SELECT id, source, level, message, timestamp, metadata FROM processed_logs %s %s %s`, where, sort, limit)
+	args := make([]any, 0)
+	args = append(args, whereArgs...)
+	args = append(args, sortArgs...)
+	args = append(args, limitArgs...)
+
+	return q, args, nil
 }
 
-func (s *ClickHouseStorage) buildWhereClause(q *ast.Query) (string, []any, error) {
+func (s *ClickHouseStorage) buildWhereClause(q ast.Query) (string, []any, error) {
 	queryParts := make([]string, 2)
 	queryArgs := make([]any, 0)
 
-	rootClause, rootArgs, err := s.parseTerm(q.Root)
+	rootClause, rootArgs, err := s.parseRootTerm(q.Root)
 	if err != nil {
 		return "", nil, fmt.Errorf("cannot build where clause do to error with root node: %w", err)
 	}
@@ -265,11 +244,13 @@ func (s *ClickHouseStorage) buildWhereClause(q *ast.Query) (string, []any, error
 	queryArgs = append(queryArgs, rootArgs...)
 
 	// timestamp
-	queryParts[1] = `timestamp BETWEEN ? AND ?`
 	if q.End.IsZero() {
-		q.End = time.Now()
+		queryParts[1] = `(timestamp >= ?)`
+		queryArgs = append(queryArgs, q.Start)
+	} else {
+		queryParts[1] = `(timestamp BETWEEN ? AND ?)`
+		queryArgs = append(queryArgs, q.Start, q.End)
 	}
-	queryArgs = append(queryArgs, q.Start, q.End)
 
 	// TODO: remove this comment or replace with my clear intention + a understandable language
 	// earlier time -----e-------------------c--------s----- newer time
@@ -282,26 +263,30 @@ func (s *ClickHouseStorage) buildWhereClause(q *ast.Query) (string, []any, error
 	// cursor
 	if q.Cursor != "" {
 		if q.Start.After(q.End) {
-			queryParts = append(queryParts, `id < ?`)
+			queryParts = append(queryParts, `(id < ?)`)
 		} else {
-			queryParts = append(queryParts, `id > ?`)
+			queryParts = append(queryParts, `(id > ?)`)
 		}
 
 		queryArgs = append(queryArgs, q.Cursor)
 	}
 
-	return fmt.Sprintf("WHERE %s", strings.Join(queryParts, "AND")), queryArgs, nil
+	return fmt.Sprintf("WHERE %s", strings.Join(queryParts, " AND ")), queryArgs, nil
 }
 
-func (s *ClickHouseStorage) parseTerm(term ast.Term) (string, []any, error) {
+func (s *ClickHouseStorage) parseRootTerm(term ast.Term) (string, []any, error) {
+	if term == nil {
+		return "(1 = 1)", []any{}, nil
+	}
+
 	switch term := term.(type) {
 	case ast.AndTerm:
-		left, leftArgs, err := s.parseTerm(term.Left)
+		left, leftArgs, err := s.parseRootTerm(term.Left)
 		if err != nil {
 			return "", nil, fmt.Errorf("cannot parse `and` term due to errors with left: %w", err)
 		}
 
-		right, rightArgs, err := s.parseTerm(term.Right)
+		right, rightArgs, err := s.parseRootTerm(term.Right)
 		if err != nil {
 			return "", nil, fmt.Errorf("cannot parse `and` term due to errors with right: %w", err)
 		}
@@ -311,12 +296,12 @@ func (s *ClickHouseStorage) parseTerm(term ast.Term) (string, []any, error) {
 
 		return fmt.Sprintf("(%s AND %s)", left, right), allArgs, nil
 	case ast.OrTerm:
-		left, leftArgs, err := s.parseTerm(term.Left)
+		left, leftArgs, err := s.parseRootTerm(term.Left)
 		if err != nil {
 			return "", nil, fmt.Errorf("cannot parse `or` term due to errors with left: %w", err)
 		}
 
-		right, rightArgs, err := s.parseTerm(term.Right)
+		right, rightArgs, err := s.parseRootTerm(term.Right)
 		if err != nil {
 			return "", nil, fmt.Errorf("cannot parse `and` term due to errors with right: %w", err)
 		}
@@ -326,7 +311,7 @@ func (s *ClickHouseStorage) parseTerm(term ast.Term) (string, []any, error) {
 
 		return fmt.Sprintf("(%s OR %s)", left, right), allArgs, nil
 	case ast.NotNode:
-		innerTerm, innerArgs, err := s.parseTerm(term.Term)
+		innerTerm, innerArgs, err := s.parseRootTerm(term.Term)
 		if err != nil {
 			return "", nil, fmt.Errorf("cannot parse `not` term: %w", err)
 		}
@@ -385,7 +370,7 @@ func (s *ClickHouseStorage) parseTerm(term ast.Term) (string, []any, error) {
 	}
 }
 
-func (s *ClickHouseStorage) buildSortClause(q *ast.Query) (string, []any, error) {
+func (s *ClickHouseStorage) buildSortClause(q ast.Query) (string, []any, error) {
 	sortFields := make([]string, len(q.Sort))
 	sortArgs := make([]any, 0)
 
@@ -400,26 +385,16 @@ func (s *ClickHouseStorage) buildSortClause(q *ast.Query) (string, []any, error)
 		sortFields[i] = fmt.Sprintf("%s %s", q.Sort[i].Name, dir)
 	}
 
-	if q.Start.After(q.End) {
-		sortFields = append(sortFields, "timestamp DESC")
-
-		if q.Cursor != "" {
-			sortFields = append(sortFields, "id < ?")
-			sortArgs = append(sortArgs, q.Cursor)
-		}
+	if !q.End.IsZero() && q.Start.After(q.End) {
+		sortFields = append(sortFields, "timestamp DESC, id DESC")
 	} else {
-		sortFields = append(sortFields, "timestamp ASC", "id > ?")
-
-		if q.Cursor != "" {
-			sortFields = append(sortFields, "id > ?")
-			sortArgs = append(sortArgs, q.Cursor)
-		}
+		sortFields = append(sortFields, "timestamp ASC, id ASC")
 	}
 
 	return fmt.Sprintf("ORDER BY %s", strings.Join(sortFields, ", ")), sortArgs, nil
 }
 
-func (s *ClickHouseStorage) buildLimitClause(q *ast.Query) (string, []any, error) {
+func (s *ClickHouseStorage) buildLimitClause(q ast.Query) (string, []any, error) {
 	if !(q.Limit >= 1 && q.Limit <= 1000) {
 		return "", nil, fmt.Errorf("limit value is not in range [0, 1000]")
 	}
@@ -435,7 +410,7 @@ func (s *ClickHouseStorage) scanRows(rows driver.Rows) ([]entity.LogRecord, erro
 
 		err := rows.Scan(&l.ID, &l.Source, &l.Level, &l.Message, &l.Timestamp, &l.Metadata)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("rows scan error: %w", err)
 		}
 
 		logs = append(logs, l)
