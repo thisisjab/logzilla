@@ -38,7 +38,7 @@ func main() {
 
 	// FIXME: create this based on config
 	db, err := storage.NewClickHouseStorage(storage.ClickHouseStorageConfig{
-		Addr:     []string{"localhost:8000"},
+		Addr:     []string{"localhost:9000"},
 		Database: "logzilla",
 		Username: "logzilla",
 		Password: "logzilla",
