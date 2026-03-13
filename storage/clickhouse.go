@@ -196,9 +196,12 @@ func (s *ClickHouseStorage) Query(ctx context.Context, req querier.QueryRequest)
 		return nil, fmt.Errorf("cannot scan rows: %w", err)
 	}
 
-	// 4) Create cursor for next batch of data (TODO)
+	cursor := ""
+	if len(logs) > 0 {
+		cursor = logs[len(logs)-1].ID.String()
+	}
 
-	return &querier.QueryResponse{Records: logs}, nil
+	return &querier.QueryResponse{Records: logs, Cursor: cursor}, nil
 }
 
 func (s *ClickHouseStorage) constructQuery(query ast.Query) (string, []any, error) {
