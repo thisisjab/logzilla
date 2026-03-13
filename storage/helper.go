@@ -1,18 +1,26 @@
 package storage
 
-import "github.com/thisisjab/logzilla/entity"
+import (
+	"strings"
 
-func parseLogLevel(level string) entity.LogLevel { //nolint:unused
+	"github.com/thisisjab/logzilla/entity"
+)
+
+func parseLogLevel(level any) entity.LogLevel { //nolint:unused
+	if l, ok := level.(string); ok {
+		level = strings.ToLower(l)
+	}
+
 	switch level {
-	case "DEBUG":
+	case "debug", 1:
 		return entity.LogLevelDebug
-	case "INFO":
+	case "info", 2:
 		return entity.LogLevelInfo
-	case "WARN":
+	case "warn", 3:
 		return entity.LogLevelWarn
-	case "ERROR":
+	case "error", 4:
 		return entity.LogLevelError
-	case "FATAL":
+	case "fatal", 5:
 		return entity.LogLevelFatal
 	default:
 		return entity.LogLevelUnknown
