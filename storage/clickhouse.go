@@ -399,7 +399,7 @@ func (s *ClickHouseStorage) buildSortClause(q ast.Query) (string, []any, error) 
 
 func (s *ClickHouseStorage) buildLimitClause(q ast.Query) (string, []any, error) {
 	if !(q.Limit >= 1 && q.Limit <= 1000) {
-		return "", nil, fmt.Errorf("limit value is not in range [0, 1000]")
+		return "", nil, fmt.Errorf("limit value is not in range [1, 1000]")
 	}
 
 	return "LIMIT ?", []any{q.Limit}, nil
@@ -409,14 +409,17 @@ func (s *ClickHouseStorage) scanRows(rows driver.Rows) ([]entity.LogRecord, erro
 	logs := make([]entity.LogRecord, 0)
 
 	for rows.Next() {
-		var l entity.LogRecord
+		var r entity.LogRecord
+		var logLevel string
 
-		err := rows.Scan(&l.ID, &l.Source, &l.Level, &l.Message, &l.Timestamp, &l.Metadata)
+		err := rows.Scan(&r.ID, &r.Source, &logLevel, &r.Message, &r.Timestamp, &r.Metadata)
 		if err != nil {
 			return nil, fmt.Errorf("rows scan error: %w", err)
 		}
 
-		logs = append(logs, l)
+		r.Level = parseLogLevel(logLevel)
+
+		logs = append(logs, r)
 	}
 
 	return logs, nil
