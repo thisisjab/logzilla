@@ -39,6 +39,6 @@
 
 - [ ] Add basic UI functionality
 
-## Querier
+## Querier (Done)
 
-- [ ] Research about options
+- [x] Research about options
