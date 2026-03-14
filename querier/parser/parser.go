@@ -57,40 +57,60 @@ func (p *Parser) nextToken() {
 	p.peekToken = p.l.NextToken()
 }
 
-func (p *Parser) ParseQuery() *ast.Query {
+func (p *Parser) ParseQuery() (*ast.Query, error) {
 	q := &ast.Query{}
 
 	isParsingFilterSection := false
 
 	for p.curToken.Type != token.EOF {
+		if p.curToken.Type == token.ILLEGAL {
+			return nil, fmt.Errorf("illegal token: %s", p.curToken.Literal)
+		}
+
 		if p.curToken.Type == token.COLON {
 			isParsingFilterSection = true
 			p.nextToken()
 		}
 
 		if isParsingFilterSection {
-			p.parseFilterStatement(q)
+			err := p.parseFilterStatement(q)
+			if err != nil {
+				return nil, err
+			}
 		} else {
-			p.parseControlStatement(q)
+			err := p.parseControlStatement(q)
+			if err != nil {
+				return nil, err
+			}
 		}
 
 		p.nextToken()
 	}
 
-	return q
+	return q, nil
 }
 
-func (p *Parser) parseFilterStatement(q *ast.Query) {
-	q.Root = p.parseStatement(LOWEST)
+func (p *Parser) parseFilterStatement(q *ast.Query) error {
+	root, err := p.parseStatement(LOWEST)
+	if err != nil {
+		return err
+	}
+
+	q.Root = root
+
+	return nil
 }
 
-func (p *Parser) parseStatement(precedence int) ast.Term {
+func (p *Parser) parseStatement(precedence int) (ast.Term, error) {
 	nud, exists := p.nudParseFns[p.curToken.Type]
 	if !exists {
 		panic(fmt.Errorf("no nud parse function for token type: `%v`", p.curToken.Type))
 	}
 
-	leftExp := nud()
+	leftExp, err := nud()
+	if err != nil {
+		return nil, fmt.Errorf("cannot parse token: %w", err)
+	}
 
 	for precedenceMap[p.peekToken.Type] > precedence {
 		p.nextToken()
@@ -99,43 +119,43 @@ func (p *Parser) parseStatement(precedence int) ast.Term {
 			panic(fmt.Errorf("no led parse function for token type: `%v`", p.curToken.Type))
 		}
 
-		leftExp = led(leftExp, precedence)
+		leftExp, err = led(leftExp, precedence)
+		if err != nil {
+			return nil, fmt.Errorf("cannot parse token: %w", err)
+		}
 	}
 
-	return leftExp
+	return leftExp, nil
 }
 
-func (p *Parser) parseControlStatement(q *ast.Query) {
-	// TODO: Handle illegal token
-
+func (p *Parser) parseControlStatement(q *ast.Query) error {
 	if p.curToken.Type == token.EOF {
-		return
+		return nil
 	}
 
 	switch p.curToken.Literal {
 	case "timestamp":
-		p.parseTimestamp(q)
+		return p.parseTimestamp(q)
 	case "limit":
-		p.parseLimit(q)
+		return p.parseLimit(q)
 	case "cursor":
-		p.parseCursor(q)
+		return p.parseCursor(q)
 	case "sort":
-		p.parseSort(q)
+		return p.parseSort(q)
 	default:
-		p.addError(fmt.Errorf("unexpected token of type `%s`", p.curToken.Type.String()))
-		return
+		return fmt.Errorf("unexpected token of type `%s (value=%s)`", p.curToken.Type.String(), p.curToken.Literal)
 	}
 }
 
-func (p *Parser) parseTimestamp(q *ast.Query) {
+func (p *Parser) parseTimestamp(q *ast.Query) error {
 	if !p.peekTokenTypeIs(token.EQUAL) {
-		return
+		return fmt.Errorf("error when parsing `timestamp`: %w", p.createPeekError(token.EQUAL))
 	}
 
 	p.nextToken()
 
 	if !p.peekTokenTypeIs(token.STRING) {
-		return
+		return fmt.Errorf("error when parsing `timestamp`: %w", p.createPeekError(token.STRING))
 	}
 
 	p.nextToken()
@@ -143,75 +163,78 @@ func (p *Parser) parseTimestamp(q *ast.Query) {
 	// Parse start
 	start, err := parseDatetime(p.curToken.Literal)
 	if err != nil {
-		p.addError(err)
-		return
+		return fmt.Errorf("cannot parse `start` for timestamp: %w", err)
 	}
 
 	q.Start = start
 
 	if p.peekToken.Type != token.COMMA {
 		// There's no value for `end`, so let's return
-		return
+		return nil
 	}
 
 	p.nextToken()
 
 	if !p.peekTokenTypeIs(token.STRING) {
-		return
+		return fmt.Errorf("error when parsing end of `timestamp`: %w", p.createPeekError(token.STRING))
 	}
 
 	p.nextToken()
 
 	end, err := parseDatetime(p.curToken.Literal)
 	if err != nil {
-		p.addError(err)
-		return
+		return fmt.Errorf("cannot parse `end` for timestamp: %w", err)
 	}
 
 	q.End = end
+
+	return nil
 }
 
-func (p *Parser) parseLimit(q *ast.Query) {
+func (p *Parser) parseLimit(q *ast.Query) error {
 	if !p.peekTokenTypeIs(token.EQUAL) {
-		return
+		return fmt.Errorf("error when parsing `limit`: %w", p.createPeekError(token.EQUAL))
 	}
 
 	p.nextToken()
 
 	if !p.peekTokenTypeIs(token.INT) {
-		return
+		return fmt.Errorf("error when parsing `limit`: %w", p.createPeekError(token.INT))
 	}
 
 	p.nextToken()
 
 	limit, err := strconv.Atoi(p.curToken.Literal)
 	if err != nil {
-		p.addError(fmt.Errorf("cannot parse limit value: `%s` is not a valid integer.", p.curToken.Literal))
-		return
+		return fmt.Errorf("cannot parse limit value: `%s` is not a valid integer.", p.curToken.Literal)
 	}
 
 	q.Limit = limit
+
+	return nil
 }
 
-func (p *Parser) parseCursor(q *ast.Query) {
+func (p *Parser) parseCursor(q *ast.Query) error {
 	if !p.peekTokenTypeIs(token.EQUAL) {
-		return
+		return fmt.Errorf("error when parsing `cursor`: %w", p.createPeekError(token.EQUAL))
 	}
 
 	p.nextToken()
 
 	if !p.peekTokenTypeIs(token.STRING, token.IDENT) {
-		return
+		return fmt.Errorf("error when parsing `cursor`: %w", p.createPeekError(token.STRING, token.IDENT))
 	}
 
 	p.nextToken()
 
 	q.Cursor = p.curToken.Literal
+
+	return nil
 }
 
-func (p *Parser) parseSort(q *ast.Query) {
+func (p *Parser) parseSort(q *ast.Query) error {
 	if !p.peekTokenTypeIs(token.EQUAL) {
-		return
+		return fmt.Errorf("error when parsing `sort`: %w", p.createPeekError(token.EQUAL))
 	}
 
 	p.nextToken()
@@ -225,15 +248,17 @@ func (p *Parser) parseSort(q *ast.Query) {
 
 		f, err := p.parseSingleSortField()
 		if err != nil {
-			return
+			return fmt.Errorf("error when parsing `sort`: %w", err)
 		}
 
 		q.Sort = append(q.Sort, f)
 
 		if p.peekToken.Type != token.COMMA {
-			return
+			return nil
 		}
 
 		p.nextToken()
 	}
+
+	return nil
 }

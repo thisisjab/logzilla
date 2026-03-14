@@ -36,7 +36,11 @@ func TestParseControlSectionTimestamp(t *testing.T) {
 		l = lexer.New(input)
 		p = New(l)
 
-		actual := p.ParseQuery()
+		actual, err := p.ParseQuery()
+		if err != nil {
+			t.Fatalf("ParseQuery for `%s` failed because: %s", input, err)
+		}
+
 		if !actual.Equal(&expected) {
 			t.Fatalf("ParseQuery(%q)\n%+v,\nwant %+v", input, actual, expected)
 		}
@@ -68,7 +72,11 @@ func TestParseControlSectionLimit(t *testing.T) {
 		l = lexer.New(input)
 		p = New(l)
 
-		actual := p.ParseQuery()
+		actual, err := p.ParseQuery()
+		if err != nil {
+			t.Fatalf("ParseQuery for `%s` failed because: %s", input, err)
+		}
+
 		if !actual.Equal(&expected) {
 			t.Fatalf("ParseQuery(%q)\n%+v,\nwant %+v", input, actual, expected)
 		}
@@ -102,7 +110,11 @@ func TestParseControlSectionCursor(t *testing.T) {
 		l = lexer.New(input)
 		p = New(l)
 
-		actual := p.ParseQuery()
+		actual, err := p.ParseQuery()
+		if err != nil {
+			t.Fatalf("ParseQuery for `%s` failed because: %s", input, err)
+		}
+
 		if !actual.Equal(&expected) {
 			t.Fatalf("ParseQuery(%q)\n%+v,\nwant %+v", input, actual, expected)
 		}
@@ -158,7 +170,11 @@ func TestParseControlSectionSort(t *testing.T) {
 		l = lexer.New(input)
 		p = New(l)
 
-		actual := p.ParseQuery()
+		actual, err := p.ParseQuery()
+		if err != nil {
+			t.Fatalf("ParseQuery for `%s` failed because: %s", input, err)
+		}
+
 		if !actual.Equal(&expected) {
 			t.Fatalf("ParseQuery(%q)\ngot:  %+v,\nwant: %+v", input, *actual, expected)
 		}
@@ -204,7 +220,11 @@ func TestParsingControlSection(t *testing.T) {
 		l = lexer.New(input)
 		p = New(l)
 
-		actual := p.ParseQuery()
+		actual, err := p.ParseQuery()
+		if err != nil {
+			t.Fatalf("ParseQuery for `%s` failed because: %s", input, err)
+		}
+
 		if !actual.Equal(&expected) {
 			t.Fatalf("ParseQuery(%q)\ngot:  %+v,\nwant: %+v", input, *actual, expected)
 		}
@@ -288,7 +308,10 @@ func TestParseIdentifier(t *testing.T) {
 		l = lexer.New(tc.input)
 		p = New(l)
 
-		query := p.ParseQuery()
+		query, err := p.ParseQuery()
+		if err != nil {
+			t.Fatalf("[%d] parse query failed with error: %s", i, err)
+		}
 
 		if query.Root == nil {
 			t.Fatalf("[%d] query has no root node", i)

@@ -8,12 +8,12 @@ import (
 )
 
 type (
-	nudParseFn func() ast.Term
-	ledParseFn func(left ast.Term, precedence int) ast.Term
+	nudParseFn func() (ast.Term, error)
+	ledParseFn func(left ast.Term, precedence int) (ast.Term, error)
 )
 
 // parseIdentifier is a nud function that parses a possible comparison term (i.e. level=info).
-func (p *Parser) parseIdentifier() ast.Term {
+func (p *Parser) parseIdentifier() (ast.Term, error) {
 	n := ast.ComparisonTerm{
 		FieldName: p.curToken.Literal,
 	}
@@ -36,59 +36,76 @@ func (p *Parser) parseIdentifier() ast.Term {
 	case token.TILDE:
 		n.Operator = ast.OperatorILike
 	default:
-		// TODO: add better error handling
-		panic(fmt.Errorf("expected an operator after comparison field name, but got `%s (%s)`", p.curToken.Literal, p.curToken.Type.String()))
+		return nil, fmt.Errorf("expected an operator after comparison field name (%s), but got `%s (%s)`", n.FieldName, p.curToken.Literal, p.curToken.Type.String())
 	}
 
 	p.nextToken()
 
 	n.Values = p.parseValues()
 
-	return n
+	return n, nil
 }
 
-func (p *Parser) parseAndCondition(left ast.Term, precedence int) ast.Term {
+func (p *Parser) parseAndCondition(left ast.Term, precedence int) (ast.Term, error) {
 	t := ast.AndTerm{
 		Left: left,
 	}
 
 	p.nextToken()
 
-	t.Right = p.parseStatement(precedence)
+	right, err := p.parseStatement(precedence)
+	if err != nil {
+		return nil, fmt.Errorf("cannot parse right side of `&` operator: %w", err)
+	}
 
-	return t
+	t.Right = right
+
+	return t, nil
 }
 
-func (p *Parser) parseOrCondition(left ast.Term, precedence int) ast.Term {
+func (p *Parser) parseOrCondition(left ast.Term, precedence int) (ast.Term, error) {
 	t := ast.OrTerm{
 		Left: left,
 	}
 
 	p.nextToken()
 
-	t.Right = p.parseStatement(precedence)
+	right, err := p.parseStatement(precedence)
+	if err != nil {
+		return nil, fmt.Errorf("cannot parse right side of `|` operator: %w", err)
+	}
 
-	return t
+	t.Right = right
+
+	return t, nil
 }
 
-func (p *Parser) parseLParen() ast.Term {
+func (p *Parser) parseLParen() (ast.Term, error) {
 	p.nextToken()
 
-	exp := p.parseStatement(LOWEST)
+	exp, err := p.parseStatement(LOWEST)
+	if err != nil {
+		return nil, fmt.Errorf("cannot parse statement after `(`: %w", err)
+	}
 
 	if p.peekToken.Type != token.RPAREN {
-		// TODO: add error handling
-		panic(fmt.Errorf("expected RPAREN, but got %s (%s)", p.peekToken.Literal, p.peekToken.Type))
+		return nil, fmt.Errorf("expected closing `)`, but got %s (%s)", p.peekToken.Literal, p.peekToken.Type)
 	}
 
 	p.nextToken()
 
-	return exp
+	return exp, nil
 }
 
-func (p *Parser) parseNot() ast.Term {
+func (p *Parser) parseNot() (ast.Term, error) {
 	p.nextToken()
-	return ast.NotNode{
-		Term: p.parseStatement(LOWEST),
+
+	t, err := p.parseStatement(LOWEST)
+	if err != nil {
+		return nil, fmt.Errorf("cannot parse right side of `!` operator: %w", err)
 	}
+
+	return ast.NotNode{
+		Term: t,
+	}, nil
 }

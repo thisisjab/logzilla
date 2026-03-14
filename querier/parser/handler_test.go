@@ -27,7 +27,13 @@ func TestParseConditionTerm(t *testing.T) {
 	for i, tc := range tests {
 		l = lexer.New(tc.input)
 		p = New(l)
-		result := p.ParseQuery().Root.String()
+
+		parseQueryResult, err := p.ParseQuery()
+		if err != nil {
+			t.Fatalf("[%d] failed because: `%s`", i, err)
+		}
+
+		result := parseQueryResult.Root.String()
 
 		if result != tc.expected {
 			t.Fatalf("[%d] expected `%s` after parsing, but got `%s`", i, tc.expected, result)
@@ -59,7 +65,13 @@ func TestParseAndTerm(t *testing.T) {
 	for i, tc := range tests {
 		l = lexer.New(tc.input)
 		p = New(l)
-		result := p.ParseQuery().Root.String()
+
+		parseQueryResult, err := p.ParseQuery()
+		if err != nil {
+			t.Fatalf("[%d] failed because: `%s`", i, err)
+		}
+
+		result := parseQueryResult.Root.String()
 
 		if result != tc.expected {
 			t.Fatalf("[%d] expected `%s` after parsing, but got `%s`", i, tc.expected, result)
@@ -91,7 +103,13 @@ func TestParseOrTerm(t *testing.T) {
 	for i, tc := range tests {
 		l = lexer.New(tc.input)
 		p = New(l)
-		result := p.ParseQuery().Root.String()
+
+		parseQueryResult, err := p.ParseQuery()
+		if err != nil {
+			t.Fatalf("[%d] failed because: `%s`", i, err)
+		}
+
+		result := parseQueryResult.Root.String()
 
 		if result != tc.expected {
 			t.Fatalf("[%d] expected `%s` after parsing, but got `%s`", i, tc.expected, result)
@@ -139,7 +157,13 @@ func TestParseLParen(t *testing.T) {
 	for i, tc := range tests {
 		l = lexer.New(tc.input)
 		p = New(l)
-		result := p.ParseQuery().Root.String()
+
+		parseQueryResult, err := p.ParseQuery()
+		if err != nil {
+			t.Fatalf("[%d] failed because: `%s`", i, err)
+		}
+
+		result := parseQueryResult.Root.String()
 
 		if result != tc.expected {
 			t.Fatalf("[%d] expected `%s` after parsing, but got `%s`", i, tc.expected, result)
@@ -179,7 +203,13 @@ func TestParseNot(t *testing.T) {
 	for i, tc := range tests {
 		l = lexer.New(tc.input)
 		p = New(l)
-		result := p.ParseQuery().Root.String()
+
+		parseQueryResult, err := p.ParseQuery()
+		if err != nil {
+			t.Fatalf("[%d] failed because: `%s`", i, err)
+		}
+
+		result := parseQueryResult.Root.String()
 
 		if result != tc.expected {
 			t.Fatalf("[%d] expected `%s` after parsing, but got `%s`", i, tc.expected, result)

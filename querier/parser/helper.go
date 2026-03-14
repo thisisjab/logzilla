@@ -15,14 +15,19 @@ func (p *Parser) addError(err error) {
 	p.errors = append(p.errors, err)
 }
 
-func (p *Parser) addPeekError(expectedTokens ...token.TokenType) {
+func (p *Parser) createPeekError(expectedTokens ...token.TokenType) error {
 	values := make([]string, len(expectedTokens))
 
 	for i := range expectedTokens {
 		values[i] = fmt.Sprintf("`%s`", expectedTokens[i])
 	}
 
-	p.addError(fmt.Errorf("expected token of type %v, but got %v (literal=`%s`)", strings.Join(values, ", "), p.peekToken.Type, p.peekToken.Literal))
+	return fmt.Errorf("expected token of type %v, but got %v (literal=`%s`)", strings.Join(values, ", "), p.peekToken.Type, p.peekToken.Literal)
+
+}
+
+func (p *Parser) addPeekError(expectedTokens ...token.TokenType) {
+	p.addError(p.createPeekError(expectedTokens...))
 }
 
 func (p *Parser) peekTokenTypeIs(expected ...token.TokenType) bool {
