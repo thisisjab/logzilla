@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/lmittmann/tint"
+	"github.com/thisisjab/logzilla/api"
 	"github.com/thisisjab/logzilla/engine"
 	"github.com/thisisjab/logzilla/processor"
 	"github.com/thisisjab/logzilla/source"
@@ -14,15 +15,28 @@ import (
 	"go.yaml.in/yaml/v3"
 )
 
-type Config struct {
-	Logger                  LoggerConfig      `yaml:"logger"`
-	Storage                 StorageConfig     `yaml:"storage"`
-	Processors              []ProcessorConfig `yaml:"processors"`
-	Sources                 []SourceConfig    `yaml:"sources"`
-	RawLogsBufferSize       uint              `yaml:"raw_logs_buffer_size"`
-	StorageFlushInterval    time.Duration     `yaml:"storage_flush_interval"`
-	ProcessedLogsBufferSize uint              `yaml:"processed_logs_buffer_size"`
-	ProcessorWorkersCount   uint              `yaml:"processor_workers_count"`
+// ParsedConfig contains parsed and validated configuration for engine, api server, logger, etc.
+type ParsedConfig struct {
+	EngineConfig    engine.Config
+	APIServerConfig api.Config
+}
+
+// ConfigSchema defines the format of `config.yaml`.
+type ConfigSchema struct {
+	Engine     EngineConfig      `yaml:"engine"`
+	Server     api.Config        `yaml:"api-server"`
+	Logger     LoggerConfig      `yaml:"logger"`
+	Storage    StorageConfig     `yaml:"storage"`
+	Processors []ProcessorConfig `yaml:"processors"`
+	Sources    []SourceConfig    `yaml:"sources"`
+}
+
+// Engine config defines all the settings used
+type EngineConfig struct {
+	RawLogsBufferSize       uint          `yaml:"raw-logs-buffer-size"`
+	StorageFlushInterval    time.Duration `yaml:"storage-flush-interval"`
+	ProcessedLogsBufferSize uint          `yaml:"processed-logs-buffer-size"`
+	ProcessorWorkersCount   uint          `yaml:"processor-workers-count"`
 }
 
 type LoggerConfig struct {
@@ -37,19 +51,17 @@ type StorageConfig struct {
 }
 
 type ProcessorConfig struct {
-	Name   string `yaml:"name"`
 	Type   string `yaml:"type"`
 	Config any    `yaml:"config"`
 }
 
 type SourceConfig struct {
-	Name       string   `yaml:"name"`
 	Type       string   `yaml:"type"`
 	Processors []string `yaml:"processors"`
 	Config     any      `yaml:"config"`
 }
 
-func (cfg Config) Parse() (*engine.Config, *slog.Logger, error) {
+func (cfg ConfigSchema) Parse() (*ParsedConfig, *slog.Logger, error) {
 	logger, err := parseLoggerConfig(cfg.Logger)
 	if err != nil {
 		return nil, nil, fmt.Errorf("cannot create logger: %w", err)
@@ -64,7 +76,7 @@ func (cfg Config) Parse() (*engine.Config, *slog.Logger, error) {
 	for i, pc := range cfg.Processors {
 		p, err := parseProcessorConfig(logger, pc)
 		if err != nil {
-			return nil, logger, fmt.Errorf("cannot create processor `%s`: %w", pc.Name, err)
+			return nil, logger, fmt.Errorf("cannot create processor: %w", err)
 		}
 		processors[i] = p
 	}
@@ -73,19 +85,22 @@ func (cfg Config) Parse() (*engine.Config, *slog.Logger, error) {
 	for i, sc := range cfg.Sources {
 		s, err := parseSourceConfig(logger, sc)
 		if err != nil {
-			return nil, logger, fmt.Errorf("cannot create source `%s`: %w", sc.Name, err)
+			return nil, logger, fmt.Errorf("cannot create log source: %w", err)
 		}
 		sources[i] = s
 	}
 
-	return &engine.Config{
-		RawLogsBufferMaxSize:       cfg.RawLogsBufferSize,
-		StorageFlushInterval:       cfg.StorageFlushInterval,
-		ProcessedLogsBufferMaxSize: cfg.ProcessedLogsBufferSize,
-		ProcessorWorkersCount:      cfg.ProcessorWorkersCount,
-		Storage:                    st,
-		Processors:                 processors,
-		Sources:                    sources,
+	return &ParsedConfig{
+		APIServerConfig: cfg.Server,
+		EngineConfig: engine.Config{
+			RawLogsBufferMaxSize:       cfg.Engine.RawLogsBufferSize,
+			StorageFlushInterval:       cfg.Engine.StorageFlushInterval,
+			ProcessedLogsBufferMaxSize: cfg.Engine.ProcessedLogsBufferSize,
+			ProcessorWorkersCount:      cfg.Engine.ProcessorWorkersCount,
+			Storage:                    st,
+			Processors:                 processors,
+			Sources:                    sources,
+		},
 	}, logger, nil
 }
 
@@ -154,7 +169,6 @@ func parseSourceConfig(logger *slog.Logger, cfg SourceConfig) (engine.LogSource,
 			return nil, fmt.Errorf("cannot create file source: %w", err)
 		}
 
-		fileConfig.Name = cfg.Name
 		fileConfig.ProcessorNames = cfg.Processors
 
 		s, err := source.NewFileLogSource(logger, fileConfig)
@@ -177,8 +191,6 @@ func parseProcessorConfig(logger *slog.Logger, cfg ProcessorConfig) (engine.LogP
 			return nil, fmt.Errorf("cannot create json processor: %w", err)
 		}
 
-		jsonConfig.Name = cfg.Name
-
 		p, err := processor.NewJsonLogProcessor(jsonConfig)
 		if err != nil {
 			return nil, fmt.Errorf("cannot create json processor: %w", err)
@@ -191,8 +203,6 @@ func parseProcessorConfig(logger *slog.Logger, cfg ProcessorConfig) (engine.LogP
 		if err != nil {
 			return nil, fmt.Errorf("cannot create lua processor: %w", err)
 		}
-
-		luaConfig.Name = cfg.Name
 
 		p, err := processor.NewLuaLogProcessor(luaConfig)
 		if err != nil {

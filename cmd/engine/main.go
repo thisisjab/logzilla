@@ -25,12 +25,12 @@ func main() {
 		panic(fmt.Errorf("cannot read config file content: %w", err))
 	}
 
-	var cfg config.Config
+	var cfg config.ConfigSchema
 	if err := yaml.Unmarshal(fileContent, &cfg); err != nil {
 		panic(fmt.Errorf("cannot parse config file: %w", err))
 	}
 
-	engineCfg, logger, err := cfg.Parse()
+	parsedCfg, logger, err := cfg.Parse()
 	if err != nil {
 		if logger != nil {
 			logger.Error("cannot parse config file", "error", err)
@@ -58,7 +58,7 @@ func main() {
 	}()
 
 	// Create engine
-	engine, err := engine.New(*engineCfg, logger)
+	engine, err := engine.New(parsedCfg.EngineConfig, logger)
 	if err != nil {
 		logger.Error("engine error.", "error", err)
 		os.Exit(1)
