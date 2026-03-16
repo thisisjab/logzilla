@@ -10,6 +10,7 @@ import (
 	"github.com/thisisjab/logzilla/api"
 	"github.com/thisisjab/logzilla/engine"
 	"github.com/thisisjab/logzilla/processor"
+	"github.com/thisisjab/logzilla/querier"
 	"github.com/thisisjab/logzilla/source"
 	"github.com/thisisjab/logzilla/storage"
 	"go.yaml.in/yaml/v3"
@@ -19,6 +20,7 @@ import (
 type ParsedConfig struct {
 	EngineConfig    engine.Config
 	APIServerConfig api.Config
+	Storage         parsedStorage
 }
 
 // ConfigSchema defines the format of `config.yaml`.
@@ -92,6 +94,7 @@ func (cfg ConfigSchema) Parse() (*ParsedConfig, *slog.Logger, error) {
 
 	return &ParsedConfig{
 		APIServerConfig: cfg.Server,
+		Storage:         st,
 		EngineConfig: engine.Config{
 			RawLogsBufferMaxSize:       cfg.Engine.RawLogsBufferSize,
 			StorageFlushInterval:       cfg.Engine.StorageFlushInterval,
@@ -139,7 +142,13 @@ func parseLoggerConfig(cfg LoggerConfig) (*slog.Logger, error) {
 	return logger, nil
 }
 
-func parseStorageConfig(cfg StorageConfig) (engine.Storage, error) {
+type parsedStorage interface {
+	storage.Storage
+	querier.QuerierStorage
+	engine.EngineStorage
+}
+
+func parseStorageConfig(cfg StorageConfig) (parsedStorage, error) {
 	switch cfg.Type {
 	case "clickhouse":
 		var clickHouseConfig storage.ClickHouseStorageConfig
@@ -206,7 +215,7 @@ func parseProcessorConfig(logger *slog.Logger, cfg ProcessorConfig) (engine.LogP
 
 		p, err := processor.NewLuaLogProcessor(luaConfig)
 		if err != nil {
-			return nil, fmt.Errorf("cannot create json processor: %w", err)
+			return nil, fmt.Errorf("cannot create lua processor: %w", err)
 		}
 
 		return p, nil

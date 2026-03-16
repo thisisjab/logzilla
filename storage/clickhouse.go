@@ -73,7 +73,7 @@ func setupClickHouseTables(ctx context.Context, conn driver.Conn) error {
 	return err
 }
 
-func (s *ClickHouseStorage) Connect(ctx context.Context) error {
+func (s *ClickHouseStorage) Open(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 

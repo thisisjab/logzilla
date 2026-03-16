@@ -7,7 +7,9 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
+	"github.com/thisisjab/logzilla/api"
 	"github.com/thisisjab/logzilla/config"
 	"github.com/thisisjab/logzilla/engine"
 	"gopkg.in/yaml.v3"
@@ -46,16 +48,27 @@ func main() {
 		}
 	}()
 
+	// Open storage
+	logger.Info("connecting to storage")
+	if err := parsedCfg.Storage.Open(ctx); err != nil {
+		logger.Error("cannot open connection to the storage", "error", err)
+	}
+	// Close storage
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+
+		logger.Info("closing storage connection")
+		err := parsedCfg.Storage.Close(ctx)
+		if err != nil {
+			logger.Error("cannot close storage connection", "error", err)
+		}
+
+		cancel()
+	}()
+
 	// Setup signal handling to catch Ctrl+C (SIGINT) or Terminate (SIGTERM)
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-
-	// Run the engine in a separate goroutine so we can wait for signals
-	go func() {
-		sig := <-sigChan
-		logger.Info("received signal. shutting down.", "signal", sig)
-		cancel()
-	}()
 
 	// Create engine
 	engine, err := engine.New(parsedCfg.EngineConfig, logger)
@@ -64,11 +77,32 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Run engine
-	if err := engine.Run(ctx); err != nil {
-		logger.Error("engine error.", "error", err)
-		cancel()
+	// Create api server
+	apiServer, err := api.NewServer(parsedCfg.APIServerConfig, parsedCfg.Storage, logger)
+	if err != nil {
+		logger.Error("api server error.", "error", err)
+		os.Exit(1)
 	}
 
+	// Run engine
+	go func() {
+		if err := engine.Run(ctx); err != nil {
+			logger.Error("engine error.", "error", err)
+			cancel()
+		}
+	}()
+
+	// Run api server
+	go func() {
+		if err := apiServer.Serve(ctx); err != nil {
+			logger.Error("api server error.", "error", err)
+			cancel()
+		}
+	}()
+
+	// Wait for signal
+	sig := <-sigChan
+	logger.Info("received signal. shutting down.", "signal", sig)
+	cancel()
 	logger.Info("engine stopped.")
 }

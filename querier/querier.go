@@ -16,6 +16,6 @@ type QueryResponse struct {
 	Cursor  string
 }
 
-type Querier interface {
+type QuerierStorage interface {
 	Query(ctx context.Context, req QueryRequest) (*QueryResponse, error)
 }
