@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/thisisjab/logzilla/api/ui"
 	"github.com/thisisjab/logzilla/querier"
 )
 
@@ -37,9 +38,12 @@ func NewServer(cfg Config, queryable ServerStorage, logger *slog.Logger) (*serve
 func (s *server) routes() http.Handler {
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("GET /api/healthcheck", s.healthCheckHandler)
+	// UI
+	mux.HandleFunc("GET /", s.indexPageHandler)
+	mux.Handle("GET /static/", http.FileServerFS(ui.Files))
 
-	// Fetching logs and sources
+	// API
+	mux.HandleFunc("GET /api/healthcheck", s.healthCheckHandler)
 	mux.HandleFunc("POST /api/logs/search", s.searchLogsHandler)
 
 	return s.recoverPanicMiddleware(s.requestLoggerMiddleware(s.corsMiddleware(mux)))

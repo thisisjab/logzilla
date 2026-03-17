@@ -1,8 +1,10 @@
 package api
 
 import (
+	"html/template"
 	"net/http"
 
+	"github.com/thisisjab/logzilla/api/ui"
 	"github.com/thisisjab/logzilla/fault"
 	"github.com/thisisjab/logzilla/querier"
 	"github.com/thisisjab/logzilla/querier/lexer"
@@ -52,4 +54,15 @@ func (s *server) searchLogsHandler(w http.ResponseWriter, r *http.Request) {
 		nil,
 	)
 
+}
+
+func (s *server) indexPageHandler(w http.ResponseWriter, r *http.Request) {
+	t, err := template.ParseFS(ui.Files, "templates/index.html")
+	if s.returnOnError(w, r, err) {
+		return
+	}
+
+	if err := t.Execute(w, nil); s.returnOnError(w, r, err) {
+		return
+	}
 }
