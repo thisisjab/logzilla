@@ -1,12 +1,12 @@
-package api
+package server
 
 import (
 	"context"
 	"log/slog"
 	"net/http"
 
-	"github.com/thisisjab/logzilla/api/ui"
 	"github.com/thisisjab/logzilla/querier"
+	"github.com/thisisjab/logzilla/server/ui"
 )
 
 type ServerStorage interface {
@@ -23,7 +23,7 @@ type server struct {
 	logger   *slog.Logger
 }
 
-func NewServer(cfg Config, queryable ServerStorage, logger *slog.Logger) (*server, error) {
+func New(cfg Config, queryable ServerStorage, logger *slog.Logger) (*server, error) {
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}

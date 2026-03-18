@@ -1,14 +1,14 @@
-package api
+package server
 
 import (
 	"html/template"
 	"net/http"
 
-	"github.com/thisisjab/logzilla/api/ui"
 	"github.com/thisisjab/logzilla/fault"
 	"github.com/thisisjab/logzilla/querier"
 	"github.com/thisisjab/logzilla/querier/lexer"
 	"github.com/thisisjab/logzilla/querier/parser"
+	"github.com/thisisjab/logzilla/server/ui"
 )
 
 func (s *server) searchLogsHandler(w http.ResponseWriter, r *http.Request) {

@@ -9,9 +9,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/thisisjab/logzilla/api"
 	"github.com/thisisjab/logzilla/config"
 	"github.com/thisisjab/logzilla/engine"
+	"github.com/thisisjab/logzilla/server"
 	"gopkg.in/yaml.v3"
 )
 
@@ -78,7 +78,7 @@ func main() {
 	}
 
 	// Create api server
-	apiServer, err := api.NewServer(parsedCfg.APIServerConfig, parsedCfg.Storage, logger)
+	apiServer, err := server.New(parsedCfg.APIServerConfig, parsedCfg.Storage, logger)
 	if err != nil {
 		logger.Error("api server error.", "error", err)
 		os.Exit(1)

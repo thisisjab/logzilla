@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/lmittmann/tint"
-	"github.com/thisisjab/logzilla/api"
+	"github.com/thisisjab/logzilla/server"
 	"github.com/thisisjab/logzilla/engine"
 	"github.com/thisisjab/logzilla/processor"
 	"github.com/thisisjab/logzilla/querier"
@@ -19,14 +19,14 @@ import (
 // ParsedConfig contains parsed and validated configuration for engine, api server, logger, etc.
 type ParsedConfig struct {
 	EngineConfig    engine.Config
-	APIServerConfig api.Config
+	APIServerConfig server.Config
 	Storage         parsedStorage
 }
 
 // ConfigSchema defines the format of `config.yaml`.
 type ConfigSchema struct {
 	Engine     EngineConfig      `yaml:"engine"`
-	Server     api.Config        `yaml:"api-server"`
+	Server     server.Config        `yaml:"api-server"`
 	Logger     LoggerConfig      `yaml:"logger"`
 	Storage    StorageConfig     `yaml:"storage"`
 	Processors []ProcessorConfig `yaml:"processors"`
