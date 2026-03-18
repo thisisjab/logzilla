@@ -1,67 +1,75 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link href="/static/css/main.css" rel="stylesheet" />
-    <title>Logzilla</title>
-  </head>
-  <body>
-    <header class="top-header">
-      <h1 class="top-header__title">Logzilla Dashboard</h1>
-    </header>
-    <nav class="query-nav">
-      <div class="query-container">
-        <span class="query-container__prompt">>>></span>
-        <input
-          class="query-container__input"
-          type="text"
-          pattern="type in some query"
-        />
-        <input class="query-container__submit" type="submit" value="Query" />
-      </div>
-    </nav>
-    <main class="logs-container">
-      <div class="table-wrapper">
-        <table class="logs-table" style="width: 100%">
-          <tr class="logs-table__tr">
-            <th class="logs-table__th">ID</th>
-            <th class="logs-table__th">Source</th>
-            <th class="logs-table__th">Message</th>
-            <th class="logs-table__th">Level</th>
-            <th class="logs-table__th">Timestamp</th>
-            <th class="logs-table__th">Metadata</th>
-          </tr>
-          <tr class="logs-table__tr">
-            <td class="logs-table__td">j34-234jvvv-4234</td>
-            <td class="logs-table__td">main-server</td>
-            <td class="logs-table__td">Hello</td>
-            <td class="logs-table__td">INFO</td>
-            <td class="logs-table__td">2022-02-11T23:17:10+0</td>
-            <td class="logs-table__td">{"ip": "10.0.0.1"}</td>
-          </tr>
-          <tr class="logs-table__tr">
-            <td class="logs-table__td">j34-234jvvv-4234</td>
-            <td class="logs-table__td">main-server</td>
-            <td class="logs-table__td">
-              Hello this is a random message which is not good
-            </td>
-            <td class="logs-table__td">INFO</td>
-            <td class="logs-table__td">2022-02-11T23:17:10+0</td>
-            <td class="logs-table__td">{"ip": "10.0.0.1"}</td>
-          </tr>
-          <tr class="logs-table__tr">
-            <td class="logs-table__td">j34-234jvvv-4234</td>
-            <td class="logs-table__td">main-server</td>
-            <td class="logs-table__td">Hello</td>
-            <td class="logs-table__td">INFO</td>
-            <td class="logs-table__td">2022-02-11T23:17:10+0</td>
-            <td class="logs-table__td">
-              {"ip": "10.0.0.1" "http_headers": {"Authorization": "Bearer xxxxxxxxxxxxxxxxxxxxxxxxxxxx"} }
-            </td>
-          </tr>
-        </table>
-      </div>
-    </main>
-  </body>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <link href="/static/css/main.css" rel="stylesheet" />
+        <title>Logzilla</title>
+    </head>
+    <body>
+        <header class="top-header">
+            <h1 class="top-header__title">Logzilla Dashboard</h1>
+        </header>
+        <nav class="query-nav">
+            <div class="query-container">
+                <span class="query-container__prompt">>>></span>
+                <input
+                    class="query-container__input"
+                    type="text"
+                    pattern="type in some query"
+                />
+                <input
+                    class="query-container__submit"
+                    type="submit"
+                    value="Query"
+                />
+            </div>
+        </nav>
+        <main class="logs-container">
+            <div class="logs-container__cursor">
+                Cursor: <span>ttf4a-sdf3234</span>
+            </div>
+            <div class="table-wrapper">
+                <table class="logs-table" style="width: 100%">
+                    <tr class="logs-table__tr">
+                        <th class="logs-table__th">ID</th>
+                        <th class="logs-table__th">Source</th>
+                        <th class="logs-table__th">Message</th>
+                        <th class="logs-table__th">Level</th>
+                        <th class="logs-table__th">Timestamp</th>
+                        <th class="logs-table__th">Metadata</th>
+                    </tr>
+                    <tr class="logs-table__tr">
+                        <td class="logs-table__td">j34-234jvvv-4234</td>
+                        <td class="logs-table__td">main-server</td>
+                        <td class="logs-table__td">Hello</td>
+                        <td class="logs-table__td">INFO</td>
+                        <td class="logs-table__td">2022-02-11T23:17:10+0</td>
+                        <td class="logs-table__td">{"ip": "10.0.0.1"}</td>
+                    </tr>
+                    <tr class="logs-table__tr">
+                        <td class="logs-table__td">j34-234jvvv-4234</td>
+                        <td class="logs-table__td">main-server</td>
+                        <td class="logs-table__td">
+                            Hello this is a random message which is not good
+                        </td>
+                        <td class="logs-table__td">INFO</td>
+                        <td class="logs-table__td">2022-02-11T23:17:10+0</td>
+                        <td class="logs-table__td">{"ip": "10.0.0.1"}</td>
+                    </tr>
+                    <tr class="logs-table__tr">
+                        <td class="logs-table__td">j34-234jvvv-4234</td>
+                        <td class="logs-table__td">main-server</td>
+                        <td class="logs-table__td">Hello</td>
+                        <td class="logs-table__td">INFO</td>
+                        <td class="logs-table__td">2022-02-11T23:17:10+0</td>
+                        <td class="logs-table__td">
+                            {"ip": "10.0.0.1" "http_headers": {"Authorization":
+                            "Bearer xxxxxxxxxxxxxxxxxxxxxxxxxxxx"} }
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </main>
+    </body>
 </html>
