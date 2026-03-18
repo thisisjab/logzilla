@@ -1,10 +1,10 @@
 /* Theme */
 :root {
-  --secondary-5-color: #a850b5;
-  --primary-3-color: #4153bb;
-  --primary-5-color: #36459d;
-  --primary-7-color: #263275;
-  --primary-9-color: #202854;
+  --secondary-5-color: #37ff00;
+  --primary-3-color: #4ce14f;
+  --primary-5-color: #429d36;
+  --primary-7-color: #267529;
+  --primary-9-color: #205424;
   --gray-2-color: #e2e2e2;
   --gray-9-color: #222;
   --default-padding: 1rem;
@@ -34,9 +34,7 @@ body {
     var(--primary-7-color),
     var(--primary-9-color)
   ); */
-  background-image: url("/static/images/bg.png");
-  background-size: contain;
-  background-size: 100%;
+  background-color: var(--gray-9-color);
   padding: var(--default-padding);
   gap: 1rem;
   display: flex;
@@ -57,9 +55,8 @@ body {
 .query-nav,
 .logs-container {
   border: 1px solid var(--primary-3-color);
-  background-color: color-mix(in srgb, var(--primary-9-color) 70%, transparent);
+  /* background-color: color-mix(in srgb, var(--primary-9-color) 70%, transparent); */
   backdrop-filter: var(--backdrop-filter);
-  padding: var(--default-padding);
 }
 
 .query-container {
@@ -70,11 +67,13 @@ body {
 }
 
 .query-container__prompt {
+  padding: calc(var(--default-padding) / 2);
   color: var(--secondary-5-color);
   text-shadow: var(--secondary-5-color) 0px 0px 10px;
 }
 
 .query-container__input {
+  font-size: 1.2rem;
   flex-grow: 1;
   outline: none;
   background-color: transparent;
@@ -86,13 +85,14 @@ body {
 .query-container__submit {
   padding: calc(var(--default-padding) / 2);
   border: 0;
-  color: var(--gray-2-color);
+  color: var(--gray-9-color);
   box-shadow: var(--secondary-5-color) 0px 0px 10px;
   background-color: var(--secondary-5-color);
   text-transform: uppercase;
 }
 
 .query-container__submit:hover {
+  color: var(--gray-2-color);
   background-color: var(--primary-5-color);
   cursor: pointer;
 }
@@ -102,7 +102,7 @@ body {
   min-width: 100px;
   text-align: center;
   white-space: nowrap;
-  padding: 0.5rem;
+  padding: 1rem;
   border: 1px solid var(--primary-3-color);
 }
 
@@ -140,7 +140,7 @@ main.logs-container {
 }
 
 .logs-table {
-    font-size: 1rem;
+  font-size: 1rem;
   width: 100%;
   border-collapse: collapse;
 }
