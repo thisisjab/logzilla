@@ -57,7 +57,7 @@ func (s *server) searchLogsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *server) indexPageHandler(w http.ResponseWriter, r *http.Request) {
-	t, err := template.ParseFS(ui.Files, "templates/index.html")
+	t, err := template.ParseFS(ui.Files, "index.html")
 	if s.returnOnError(w, r, err) {
 		return
 	}
