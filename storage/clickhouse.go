@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"strings"
@@ -161,7 +162,12 @@ func (s *ClickHouseStorage) StoreProcessedLogs(ctx context.Context, logs ...enti
 	}
 
 	for _, log := range logs {
-		err = batch.Append(log.ID, log.Source, log.Timestamp, log.Level, log.Message, log.Metadata)
+		m, err := json.Marshal(log.Metadata)
+		if err != nil {
+			return fmt.Errorf("cannot marshal log metadata: %w", err)
+		}
+
+		err = batch.Append(log.ID, log.Source, log.Timestamp, log.Level, log.Message, m)
 
 		if err != nil {
 			return fmt.Errorf("couldn't append log to batch: %w", err)
@@ -252,7 +258,12 @@ func (s *ClickHouseStorage) buildWhereClause(q ast.Query) (string, []any, error)
 		queryArgs = append(queryArgs, q.Start)
 	} else {
 		queryParts[1] = `(timestamp BETWEEN ? AND ?)`
-		queryArgs = append(queryArgs, q.Start, q.End)
+
+		if q.End.After(q.Start) {
+			queryArgs = append(queryArgs, q.Start, q.End)
+		} else {
+			queryArgs = append(queryArgs, q.End, q.Start)
+		}
 	}
 
 	// TODO: remove this comment or replace with my clear intention + a understandable language
