@@ -3,13 +3,13 @@ package server
 import "errors"
 
 type CORSConfig struct {
-	TrustedOrigins []string `yaml:"trusted_origins"`
+	TrustedOrigins []string `yaml:"trusted-origins"`
 }
 
 type Config struct {
 	Addr     string     `yaml:"addr"`
-	CertFile string     `yaml:"cert_file"`
-	KeyFile  string     `yaml:"key_file"`
+	CertFile string     `yaml:"cert-file"`
+	KeyFile  string     `yaml:"key-file"`
 	CORS     CORSConfig `yaml:"cors"`
 }
 
