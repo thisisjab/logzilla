@@ -109,3 +109,7 @@ func (p *Parser) parseNot() (ast.Term, error) {
 		Term: t,
 	}, nil
 }
+
+func (p *Parser) parseEOF() (ast.Term, error) {
+	return ast.ComparisonTerm{FieldName: "id", Operator: ast.OperatorNe, Values: []any{nil}}, nil
+}
