@@ -3,3 +3,6 @@ run flags='':
 
 test:
     - go test ./...
+
+build-ui:
+    - (cd ./ui && npm run build)
