@@ -37,7 +37,8 @@
 
 ## UI
 
-- [ ] Add basic UI functionality
+- [ ] Add pre-commit hook that builds UI before committing
+- [x] Add basic UI functionality
 
 ## Querier (Done)
 
