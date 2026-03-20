@@ -329,6 +329,8 @@ func (s *ClickHouseStorage) parseRootTerm(term ast.Term) (string, []any, error) 
 		case ast.OperatorEq:
 			if len(term.Values) > 1 {
 				op = "IN"
+			} else if len(term.Values) == 1 && term.Values[0] == nil {
+				op = "IS"
 			} else {
 				op = "="
 			}
@@ -336,6 +338,8 @@ func (s *ClickHouseStorage) parseRootTerm(term ast.Term) (string, []any, error) 
 		case ast.OperatorNe:
 			if len(term.Values) > 1 {
 				op = "NOT IN"
+			} else if len(term.Values) == 1 && term.Values[0] == nil {
+				op = "IS NOT"
 			} else {
 				op = "!="
 			}
