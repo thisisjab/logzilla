@@ -2,6 +2,7 @@ package processor
 
 import (
 	"fmt"
+	"os"
 	"sync"
 	"time"
 
@@ -31,6 +32,11 @@ type LuaLogProcessor struct {
 func NewLuaLogProcessor(cfg LuaLogProcessorConfig) (*LuaLogProcessor, error) {
 	if cfg.Name == "" {
 		return nil, fmt.Errorf("name cannot be empty")
+	}
+
+	_, err := os.Stat(cfg.ScriptPath)
+	if os.IsNotExist(err) || err != nil {
+		return nil, fmt.Errorf("cannot access lua script: %w", err)
 	}
 
 	pool := &sync.Pool{
