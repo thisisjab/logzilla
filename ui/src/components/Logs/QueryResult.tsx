@@ -9,7 +9,7 @@ interface Props {
 function QueryResult({ logs }: Props) {
     return (
         <div className=" overflow-x-auto min-w-full max-h-full rounded">
-            <table className=" bg-gray-700 p-3 rounded min-w-full table-auto border-separate border-spacing-2 overflow-auto">
+            <table className=" bg-gray-900 p-3 rounded min-w-full table-auto border-separate border-spacing-2 overflow-auto">
                 <thead className="">
                     <tr>
                         <th className="w-40 px-3 py-2 text-left text-xs font-bold text-gray-300 uppercase tracking-wider">ID</th>

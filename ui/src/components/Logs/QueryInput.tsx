@@ -17,7 +17,7 @@ function QueryInput({ onQuerySubmit }: Props) {
     }
 
     return (
-        <div className="flex items-center bg-gray-700 px-3 rounded">
+        <div className="flex items-center bg-gray-900 px-3 rounded">
             <span className="text-green-400">{'$'}</span>
             <input ref={inputRef} onKeyDown={e => {
                 if (e.key === "Enter") onSubmit()
