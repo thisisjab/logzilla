@@ -43,3 +43,7 @@
 ## Querier (Done)
 
 - [x] Research about options
+
+## Server
+
+- [ ] Add support for live trailing
