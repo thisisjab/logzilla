@@ -2,6 +2,7 @@ package parser
 
 import (
 	"fmt"
+	"regexp"
 
 	"github.com/thisisjab/logzilla/querier/ast"
 	"github.com/thisisjab/logzilla/querier/token"
@@ -12,8 +13,14 @@ type (
 	ledParseFn func(left ast.Term, precedence int) (ast.Term, error)
 )
 
+var allowedFieldsRegex = regexp.MustCompile(`^(id|level|timestamp|message|source|metadata(\.("[^"]+"|[a-zA-Z0-9_]+))?)$`)
+
 // parseIdentifier is a nud function that parses a possible comparison term (i.e. level=info).
 func (p *Parser) parseIdentifier() (ast.Term, error) {
+	if !allowedFieldsRegex.MatchString(p.curToken.Literal) {
+		return nil, fmt.Errorf("field `%s` is not allowed", p.curToken.Literal)
+	}
+
 	n := ast.ComparisonTerm{
 		FieldName: p.curToken.Literal,
 	}

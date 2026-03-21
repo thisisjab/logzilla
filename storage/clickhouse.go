@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"regexp"
 	"strings"
 	"time"
 
@@ -15,8 +14,6 @@ import (
 	"github.com/thisisjab/logzilla/querier"
 	"github.com/thisisjab/logzilla/querier/ast"
 )
-
-var allowedFieldsRegex = regexp.MustCompile(`^(id|level|timestamp|message|source|metadata(\.("[^"]+"|[a-zA-Z0-9_]+))?)$`)
 
 type ClickHouseStorageConfig struct {
 	Addr     []string `yaml:"addr"`

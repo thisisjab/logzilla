@@ -193,8 +193,8 @@ func TestParseNot(t *testing.T) {
 			expected: "!(!((level = 10)))",
 		},
 		{
-			input:    ":(!level=10) & t!=10",
-			expected: "(!((level = 10)) & (t != 10))",
+			input:    ":(!level=10) & id!=10",
+			expected: "(!((level = 10)) & (id != 10))",
 		},
 	}
 

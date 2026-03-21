@@ -42,7 +42,7 @@ func TestClickhouseBuildWhereClause(t *testing.T) {
 				End:   timeA,
 			},
 			expectedClause: "WHERE (level = ?) AND (timestamp BETWEEN ? AND ?)",
-			expectedArgs:   []any{1, timeB, timeA},
+			expectedArgs:   []any{1, timeA, timeB},
 		},
 		{
 			input: ast.Query{
@@ -62,7 +62,7 @@ func TestClickhouseBuildWhereClause(t *testing.T) {
 				Cursor: "x",
 			},
 			expectedClause: "WHERE (level = ?) AND (timestamp BETWEEN ? AND ?) AND (id < ?)",
-			expectedArgs:   []any{1, timeB, timeA, "x"},
+			expectedArgs:   []any{1, timeA, timeB, "x"},
 		},
 	}
 
