@@ -4,7 +4,6 @@ import (
 	"html/template"
 	"net/http"
 
-	"github.com/thisisjab/logzilla/fault"
 	"github.com/thisisjab/logzilla/querier"
 	"github.com/thisisjab/logzilla/querier/lexer"
 	"github.com/thisisjab/logzilla/querier/parser"
@@ -23,11 +22,8 @@ func (s *server) searchLogsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Process user given string using lexer and parser
-	// WARN: this is the worst place to do this
-	// TODO: get rid of this garbage right away
 	p, err := parser.New(lexer.New(reqBody.Query)).ParseQuery()
-	if err != nil {
-		s.handleError(w, r, fault.New(fault.BadInputCode, "Invalid query.").WithMetadata(fault.FieldErrorsMetadata{"query": []string{err.Error()}}))
+	if s.returnOnError(w, r, err) {
 		return
 	}
 

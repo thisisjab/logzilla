@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/thisisjab/logzilla/fault"
 	"github.com/thisisjab/logzilla/querier/ast"
 	"github.com/thisisjab/logzilla/querier/lexer"
 	"github.com/thisisjab/logzilla/querier/token"
@@ -22,7 +23,6 @@ type Parser struct {
 func New(l *lexer.Lexer) *Parser {
 	p := &Parser{
 		l:           l,
-		errors:      make([]error, 0),
 		nudParseFns: make(map[token.TokenType]nudParseFn),
 		ledParseFns: make(map[token.TokenType]ledParseFn),
 	}
@@ -65,7 +65,7 @@ func (p *Parser) ParseQuery() (*ast.Query, error) {
 
 	for p.curToken.Type != token.EOF {
 		if p.curToken.Type == token.ILLEGAL {
-			return nil, fmt.Errorf("illegal token: %s", p.curToken.Literal)
+			return nil, fault.New(fault.BadInputCode, "Illegal token.").WithMetadata(fault.FieldErrorsMetadata{"query": []string{fmt.Sprintf("illegal token: %s", p.curToken.Literal)}})
 		}
 
 		if p.curToken.Type == token.COLON {
@@ -76,12 +76,12 @@ func (p *Parser) ParseQuery() (*ast.Query, error) {
 		if isParsingFilterSection {
 			err := p.parseFilterStatement(q)
 			if err != nil {
-				return nil, err
+				return nil, fault.New(fault.BadInputCode, "").WithMetadata(fault.FieldErrorsMetadata{"query": []string{err.Error()}})
 			}
 		} else {
 			err := p.parseControlStatement(q)
 			if err != nil {
-				return nil, err
+				return nil, fault.New(fault.BadInputCode, "").WithMetadata(fault.FieldErrorsMetadata{"query": []string{err.Error()}})
 			}
 		}
 

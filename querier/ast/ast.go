@@ -7,13 +7,6 @@ import (
 	"github.com/thisisjab/logzilla/fault"
 )
 
-type QueryDirection string
-
-const (
-	QueryDirectionForward  QueryDirection = "forward"
-	QueryDirectionBackward QueryDirection = "backward"
-)
-
 // Query defines the parameters for searching and filtering logs.
 // It supports time-based pagination and flexible sorting.
 type Query struct {
@@ -47,16 +40,6 @@ type SortField struct {
 	Name string `json:"name"`
 	// IsDescending specifies if the sort should be in reverse order.
 	IsDescending bool `json:"is_descending"`
-}
-
-// GetQueryDirection determines the temporal direction of the search.
-// It returns QueryDirectionBackward if the End timestamp is earlier than the Start,
-// indicating the user is searching "into the past."
-func (r Query) GetQueryDirection() QueryDirection {
-	if !r.End.IsZero() && r.End.Before(r.Start) {
-		return QueryDirectionBackward
-	}
-	return QueryDirectionForward
 }
 
 func (r Query) Validate() error {
