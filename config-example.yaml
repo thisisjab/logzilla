@@ -1,0 +1,85 @@
+# Engine is the orchestrator of all the operations done by Logzilla.
+engine:
+  # Number of logs that can be processed in parallel (or concurrently according to your environment)
+  processor-workers-count: 10
+  # Max number of logs that can wait to be processed
+  raw-logs-buffer-size: 10
+  # Max number of buffered logs before being flushed to the storage - setting this to zero will disable buffering
+  processed-logs-buffer-size: 10
+  # Max wait duration before flushing buffered logs to the storage -setting this to zero will disable periodic flushing
+  storage-flush-interval: 10s # Inter
+
+# Storage defines the actual database that stores logs. For now only clickhouse is supported.
+# Timescaledb, mongodb, etc. will be added as storage services in future.
+storage:
+  type: clickhouse
+  config:
+    addr: ["localhost:9000"]
+    database: logzilla
+    username: logzilla
+    password: logzilla
+
+# All logs must have the same structure to be saved by storage.
+# This structure supports these fields:
+# - ID (uuid)
+# - source (string)
+# - message (string)
+# - level (enum: unknown, debug, info, warning, error, fatal)
+# - timestamp (datetime)
+# - metadata (a valid JSON-like object)
+#
+# Each log needs to be processed to have the given structure. You can use multiple processors for each source.
+# There are multiple processors that you can use:
+# - json and fast-json can be used for the time you have a
+#   structured JSON logs that you only need to map its fields to the corresponding Logzilla format.
+#
+# - lua can be used if you want to have full control on the log processing.
+#   For example you add/remove data from logs or do filtering before storing.
+#   Since it's lua, you are free to accept logs in any format and then process
+#   it (almost) any way you desire. You will just return level, message, timestamp, metadata at the end.
+processors:
+  - type: json
+    config:
+      name: simple-json-processor
+      timestamp: timestamp
+      message: message
+      level: level
+
+  - type: lua
+    config:
+      name: sensetive-logs-processor
+      script-path: /path/to/your-script.lua
+
+sources:
+  # Use file source to read logs from file.
+  # Rotating file support will be added in future.
+  - type: file
+    processors: ["simple-json-processor"]
+    config:
+      name: caddy-logs
+      path: "/path/to/your-logs.json"
+
+  # Use shell source to read logs from docker, journald, etc.
+  - type: shell
+    config:
+      name: api-logs
+      command: "python3 -u /www/your-api-server/main.py" # Use `-u` for python if you don't want python to buffer your logs.
+      processors: ["sensetive-logs-processor"]
+
+# Logger configuration for Logzilla itself
+logger:
+  # You can use `json`, `text`, and `colored-text` as loggers.
+  type: colored-text
+  level: debug
+
+# API server is used UI functionality in most cases.
+# In future it will support log congestion from web sources.
+api-server:
+  addr: ":8000"
+  cors:
+    trusted-origins:
+      - "http://localhost:5173"
+
+  # These two fields are optional incase you want TLS be handled by the web server.
+  key-file: /path/to/key-file
+  cert-file: /path/to/cert-file
