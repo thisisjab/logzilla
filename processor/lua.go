@@ -125,6 +125,10 @@ func (lp *LuaLogProcessor) Process(record entity.LogRecord) (entity.LogRecord, e
 }
 
 func luaTableToMap(table *lua.LTable) map[string]any {
+	if table == nil {
+		return nil
+	}
+
 	res := make(map[string]any)
 	table.ForEach(func(key, value lua.LValue) {
 		// Lua keys are usually strings for metadata, but we ensure string conversion for the map key
