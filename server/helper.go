@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/thisisjab/logzilla/fault"
+	"github.com/thisisjab/logzilla/pkg/fault"
 )
 
 type apiResponse struct {

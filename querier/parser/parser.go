@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/thisisjab/logzilla/fault"
+	"github.com/thisisjab/logzilla/pkg/fault"
 	"github.com/thisisjab/logzilla/querier/ast"
 	"github.com/thisisjab/logzilla/querier/lexer"
 	"github.com/thisisjab/logzilla/querier/token"

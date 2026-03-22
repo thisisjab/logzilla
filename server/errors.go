@@ -4,7 +4,7 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/thisisjab/logzilla/fault"
+	"github.com/thisisjab/logzilla/pkg/fault"
 )
 
 func (s *server) handleError(w http.ResponseWriter, r *http.Request, err error) {

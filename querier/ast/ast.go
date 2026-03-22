@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/thisisjab/logzilla/fault"
+	"github.com/thisisjab/logzilla/pkg/fault"
 )
 
 // Query defines the parameters for searching and filtering logs.
