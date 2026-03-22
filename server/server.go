@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/thisisjab/logzilla/querier"
 	"github.com/thisisjab/logzilla/server/ui"
@@ -18,9 +19,10 @@ type services struct {
 }
 
 type server struct {
-	cfg      Config
-	services services
-	logger   *slog.Logger
+	cfg       Config
+	services  services
+	logger    *slog.Logger
+	startTime time.Time
 }
 
 func New(cfg Config, queryable ServerStorage, logger *slog.Logger) (*server, error) {
@@ -50,6 +52,8 @@ func (s *server) routes() http.Handler {
 }
 
 func (s *server) Serve(ctx context.Context) error {
+	s.startTime = time.Now()
+
 	srv := &http.Server{
 		Addr:    s.cfg.Addr,
 		Handler: s.routes(),
