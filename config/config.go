@@ -7,10 +7,10 @@ import (
 	"time"
 
 	"github.com/lmittmann/tint"
-	"github.com/thisisjab/logzilla/server"
 	"github.com/thisisjab/logzilla/engine"
 	"github.com/thisisjab/logzilla/processor"
 	"github.com/thisisjab/logzilla/querier"
+	"github.com/thisisjab/logzilla/server"
 	"github.com/thisisjab/logzilla/source"
 	"github.com/thisisjab/logzilla/storage"
 	"go.yaml.in/yaml/v3"
@@ -26,7 +26,7 @@ type ParsedConfig struct {
 // ConfigSchema defines the format of `config.yaml`.
 type ConfigSchema struct {
 	Engine     EngineConfig      `yaml:"engine"`
-	Server     server.Config        `yaml:"api-server"`
+	Server     server.Config     `yaml:"api-server"`
 	Logger     LoggerConfig      `yaml:"logger"`
 	Storage    StorageConfig     `yaml:"storage"`
 	Processors []ProcessorConfig `yaml:"processors"`
@@ -58,9 +58,8 @@ type ProcessorConfig struct {
 }
 
 type SourceConfig struct {
-	Type       string   `yaml:"type"`
-	Processors []string `yaml:"processors"`
-	Config     any      `yaml:"config"`
+	Type   string `yaml:"type"`
+	Config any    `yaml:"config"`
 }
 
 func (cfg ConfigSchema) Parse() (*ParsedConfig, *slog.Logger, error) {
@@ -178,14 +177,27 @@ func parseSourceConfig(logger *slog.Logger, cfg SourceConfig) (engine.LogSource,
 			return nil, fmt.Errorf("cannot create file source: %w", err)
 		}
 
-		fileConfig.ProcessorNames = cfg.Processors
-
 		s, err := source.NewFileLogSource(logger, fileConfig)
 		if err != nil {
 			return nil, fmt.Errorf("cannot create file source: %w", err)
 		}
 
 		return s, nil
+
+	case "shell":
+		var shellConfig source.ShellLogSourceConfig
+		err := remarshal(cfg.Config, &shellConfig)
+		if err != nil {
+			return nil, fmt.Errorf("cannot create shell source: %w", err)
+		}
+
+		s, err := source.NewShellLogSource(logger, shellConfig)
+		if err != nil {
+			return nil, fmt.Errorf("cannot create shell source: %w", err)
+		}
+
+		return s, nil
+
 	default:
 		return nil, fmt.Errorf("invalid log source type: %s", cfg.Type)
 	}
