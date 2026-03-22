@@ -35,3 +35,6 @@ server/ui/index.html
 server/ui/icons.svg
 server/ui/favicon.svg
 server/ui/static
+
+# Built binaries
+bin/

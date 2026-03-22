@@ -6,3 +6,9 @@ test:
 
 build-ui:
     - (cd ./ui && npm run build)
+
+build-engine:
+    go build -o bin/engine ./cmd/engine
+
+build: build-ui build-engine
+    @echo "Build completed successfully."
