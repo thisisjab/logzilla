@@ -1,8 +1,16 @@
-run flags='':
+run-engine flags='': build-ui
     - go run ./cmd/engine/main.go {{flags}}
 
-test:
+run-ui flags='':
+    - (cd ./ui && npm run dev {{flags}})
+
+test-engine:
     - go test ./...
+
+test-ui:
+    - (cd ./ui && npm run test)
+
+test: test-engine test-ui
 
 build-ui:
     - (cd ./ui && npm run build)
