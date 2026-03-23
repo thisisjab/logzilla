@@ -1,4 +1,5 @@
 import { GiScorpion } from "react-icons/gi"
+import { Link } from "react-router-dom"
 
 function Header() {
     return (
@@ -7,7 +8,10 @@ function Header() {
                 <h1 className="font-extrabold text-2xl font-mono">Logzilla</h1>
                 <GiScorpion size={18} className="text-red-500" />
             </div>
-            <p className="text-gray-400 dark:text-gray-300 text-xs sm:text-sm">Rapid log aggregation solution that works with no hustle.</p>
+            <div className="flex flex-col sm:flex-row gap-2 justify-between text-gray-400 dark:text-gray-300 text-xs sm:text-sm w-full">
+                <p className="">Rapid log aggregation solution that works with no hustle.</p>
+                <Link className="underline self-end text-xs" to={"/healthcheck"}>Healthcheck</Link>
+            </div>
         </header>
     )
 }

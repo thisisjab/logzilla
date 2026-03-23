@@ -12,7 +12,7 @@ function QuerySection() {
     // TODO: add error handling
 
     return (
-        <main className="max-w-full text-nowrap m-5 grow flex flex-col overflow-hidden gap-3">
+        <main className="max-w-full text-nowrap m-5 grow flex flex-col overflow-hidden gap-3 mb-0">
             {/* Query input for writing queriers */}
             <QueryInput onQuerySubmit={q => setQuery(q)} />
 
