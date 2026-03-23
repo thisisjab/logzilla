@@ -4,10 +4,12 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/thisisjab/logzilla/entity"
 	"github.com/thisisjab/logzilla/querier/ast"
 )
 
-type SQLQueryBuilder struct{}
+type SQLQueryBuilder struct {
+}
 
 func NewSQLQueryBuilder() *SQLQueryBuilder {
 	return &SQLQueryBuilder{}
@@ -135,8 +137,6 @@ func (s *SQLQueryBuilder) parseRootTerm(term ast.Term) (string, []any, error) {
 
 		return fmt.Sprintf("NOT %s", innerTerm), innerArgs, nil
 	case ast.ComparisonTerm:
-		// TODO: check if field name is allowed
-
 		var op string
 
 		switch term.Operator {
@@ -180,6 +180,12 @@ func (s *SQLQueryBuilder) parseRootTerm(term ast.Term) (string, []any, error) {
 			return "", nil, fmt.Errorf("comparison operator `%d` is unknown", term.Operator)
 		}
 
+		// For clickhouse, log levels must be expressed using numbers (8 bit integers)
+		// Let's convert them here, but we should remove this as soon as we are using this in another SQL database.
+		if term.FieldName == "level" {
+			normalizeLevel(term.Values)
+		}
+
 		if len(term.Values) > 1 {
 			return fmt.Sprintf("(%s %s ?)", term.FieldName, op), []any{term.Values}, nil
 		}
@@ -196,8 +202,6 @@ func (s *SQLQueryBuilder) buildSortClause(q ast.Query) (string, []any, error) {
 	sortArgs := make([]any, 0)
 
 	for i := range q.Sort {
-		// TODO: validate sort field names to prevent possible SQL injection attacks
-
 		dir := "DESC"
 		if !q.Sort[i].IsDescending {
 			dir = "ASC"
@@ -225,4 +229,25 @@ func (s *SQLQueryBuilder) buildLimitClause(q ast.Query) (string, []any, error) {
 	}
 
 	return "LIMIT ?", []any{q.Limit}, nil
+}
+
+func normalizeLevel(values []any) {
+	for i, v := range values {
+		s := strings.ToLower(fmt.Sprint(v))
+
+		switch s {
+		case "1", "debug":
+			values[i] = int(entity.LogLevelDebug)
+		case "2", "info":
+			values[i] = int(entity.LogLevelInfo)
+		case "3", "warn", "warning":
+			values[i] = int(entity.LogLevelWarn)
+		case "4", "error":
+			values[i] = int(entity.LogLevelError)
+		case "5", "fatal":
+			values[i] = int(entity.LogLevelFatal)
+		default:
+			values[i] = int(entity.LogLevelUnknown)
+		}
+	}
 }

@@ -131,7 +131,7 @@ func (s *ClickHouseStorage) StoreRawLogs(ctx context.Context, logs ...entity.Log
 	}
 
 	for _, log := range logs {
-		err = batch.Append(uuid.New(), log.Source, log.Timestamp, log.Level, log.RawData)
+		err = batch.Append(uuid.New(), log.Source, log.Timestamp, int(log.Level), log.RawData)
 
 		if err != nil {
 			return fmt.Errorf("couldn't append log to batch: %w", err)
@@ -165,7 +165,7 @@ func (s *ClickHouseStorage) StoreProcessedLogs(ctx context.Context, logs ...enti
 			return fmt.Errorf("cannot marshal log metadata: %w", err)
 		}
 
-		err = batch.Append(log.ID, log.Source, log.Timestamp, log.Level, log.Message, m)
+		err = batch.Append(log.ID, log.Source, log.Timestamp, int(log.Level), log.Message, m)
 
 		if err != nil {
 			return fmt.Errorf("couldn't append log to batch: %w", err)
