@@ -1,4 +1,4 @@
-package storage
+package querybuilder
 
 import (
 	"reflect"
@@ -66,13 +66,10 @@ func TestClickhouseBuildWhereClause(t *testing.T) {
 		},
 	}
 
-	clh, err := NewClickHouseStorage(ClickHouseStorageConfig{})
-	if err != nil {
-		t.Fatalf("cannot run test due to clickhouse storage creation error: %s", err)
-	}
+	qb := NewSQLQueryBuilder()
 
 	for i, tc := range tests {
-		queryString, queryArgs, err := clh.buildWhereClause(tc.input)
+		queryString, queryArgs, err := qb.buildWhereClause(tc.input)
 
 		if err != nil {
 			t.Fatalf("[%d] parseTerm failed with an error: %s", i, err)
@@ -169,13 +166,10 @@ func TestClickhouseParseRootTerm(t *testing.T) {
 		},
 	}
 
-	clh, err := NewClickHouseStorage(ClickHouseStorageConfig{})
-	if err != nil {
-		t.Fatalf("cannot run test due to clickhouse storage creation error: %s", err)
-	}
+	qb := NewSQLQueryBuilder()
 
 	for i, tc := range tests {
-		queryString, queryArgs, err := clh.parseRootTerm(tc.input.Root)
+		queryString, queryArgs, err := qb.parseRootTerm(tc.input.Root)
 
 		if err != nil {
 			t.Fatalf("[%d] parseTerm failed with an error: %s", i, err)
@@ -238,13 +232,10 @@ func TestClickhouseBuildSortClause(t *testing.T) {
 		},
 	}
 
-	clh, err := NewClickHouseStorage(ClickHouseStorageConfig{})
-	if err != nil {
-		t.Fatalf("cannot run test due to clickhouse storage creation error: %s", err)
-	}
+	qb := NewSQLQueryBuilder()
 
 	for i, tc := range tests {
-		queryString, queryArgs, err := clh.buildSortClause(tc.input)
+		queryString, queryArgs, err := qb.buildSortClause(tc.input)
 
 		if err != nil {
 			t.Fatalf("[%d] parseTerm failed with an error: %s", i, err)
@@ -279,13 +270,10 @@ func TestClickhouseBuildLimitClause(t *testing.T) {
 		},
 	}
 
-	clh, err := NewClickHouseStorage(ClickHouseStorageConfig{})
-	if err != nil {
-		t.Fatalf("cannot run test due to clickhouse storage creation error: %s", err)
-	}
+	qb := NewSQLQueryBuilder()
 
 	for i, tc := range tests {
-		queryString, queryArgs, err := clh.buildLimitClause(tc.input)
+		queryString, queryArgs, err := qb.buildLimitClause(tc.input)
 
 		if err != nil {
 			t.Fatalf("[%d] parseTerm failed with an error: %s", i, err)
@@ -335,13 +323,10 @@ func TestClickhouseConstructQuery(t *testing.T) {
 		},
 	}
 
-	clh, err := NewClickHouseStorage(ClickHouseStorageConfig{})
-	if err != nil {
-		t.Fatalf("cannot run test due to clickhouse storage creation error: %s", err)
-	}
+	qb := NewSQLQueryBuilder()
 
 	for i, tc := range tests {
-		queryString, queryArgs, err := clh.constructQuery(tc.input)
+		queryString, queryArgs, err := qb.BuildQuery(tc.input)
 
 		if err != nil {
 			t.Fatalf("[%d] parseTerm failed with an error: %s", i, err)
