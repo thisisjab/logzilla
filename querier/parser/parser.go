@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/thisisjab/logzilla/pkg/fault"
+	"github.com/thisisjab/logzilla/pkg/helper"
 	"github.com/thisisjab/logzilla/querier/ast"
 	"github.com/thisisjab/logzilla/querier/lexer"
 	"github.com/thisisjab/logzilla/querier/token"
@@ -162,7 +163,7 @@ func (p *Parser) parseTimestamp(q *ast.Query) error {
 	p.nextToken()
 
 	// Parse start
-	start, err := parseDatetime(p.curToken.Literal)
+	start, err := helper.ParseDatetime(p.curToken.Literal)
 	if err != nil {
 		return fmt.Errorf("cannot parse `start` for timestamp: %w", err)
 	}
@@ -182,7 +183,7 @@ func (p *Parser) parseTimestamp(q *ast.Query) error {
 
 	p.nextToken()
 
-	end, err := parseDatetime(p.curToken.Literal)
+	end, err := helper.ParseDatetime(p.curToken.Literal)
 	if err != nil {
 		return fmt.Errorf("cannot parse `end` for timestamp: %w", err)
 	}

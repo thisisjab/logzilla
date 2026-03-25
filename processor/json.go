@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/thisisjab/logzilla/entity"
+	"github.com/thisisjab/logzilla/pkg/helper"
 )
 
 type JsonLogProcessorConfig struct {
@@ -51,7 +51,7 @@ func (p *JsonLogProcessor) Process(record entity.LogRecord) (entity.LogRecord, e
 		return entity.LogRecord{}, errors.New("timestamp field is missing or not a string")
 	}
 
-	timestamp, err := time.Parse(time.RFC3339, timestampValue)
+	timestamp, err := helper.ParseDatetime(timestampValue)
 	if err != nil {
 		return entity.LogRecord{}, fmt.Errorf("cannot parse timestamp: %w", err)
 	}

@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"os"
 	"sync"
-	"time"
 
 	"github.com/thisisjab/logzilla/entity"
+	"github.com/thisisjab/logzilla/pkg/helper"
 	lua "github.com/yuin/gopher-lua"
 	luajson "layeh.com/gopher-json"
 )
@@ -109,7 +109,7 @@ func (lp *LuaLogProcessor) Process(record entity.LogRecord) (entity.LogRecord, e
 	L.Pop(4)
 
 	// Parsing outside of the Lua VM Lock
-	luaTimestamp, err := time.Parse(time.RFC3339, tsRaw)
+	luaTimestamp, err := helper.ParseDatetime(tsRaw)
 	if err != nil {
 		return record, fmt.Errorf("cannot parse timestamp '%s': %w", tsRaw, err)
 	}
