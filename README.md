@@ -4,6 +4,8 @@
 
 ---
 
+![screenshot of logzilla](docs/images/screenshot.png)
+
 Logzilla is a lightweight, high-performance tool for collecting, processing, and analyzing logs from various sources. It provides a flexible pipeline architecture that enables real-time log ingestion, transformation, and querying.
 
 ## Architecture
