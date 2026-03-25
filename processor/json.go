@@ -11,9 +11,9 @@ import (
 
 type JsonLogProcessorConfig struct {
 	Name                  string `yaml:"name"`
-	LogLevelFieldName     string `yaml:"level_field"`
-	LogMessageFieldName   string `yaml:"message_field"`
-	LogTimestampFieldName string `yaml:"timestamp_field"`
+	LogLevelFieldName     string `yaml:"level-field"`
+	LogMessageFieldName   string `yaml:"message-field"`
+	LogTimestampFieldName string `yaml:"timestamp-field"`
 }
 
 // JsonLogProcessor is a simple JSON log processor. It parses JSON logs and extracts log level, message,
@@ -72,6 +72,7 @@ func (p *JsonLogProcessor) Process(record entity.LogRecord) (entity.LogRecord, e
 	delete(data, p.cfg.LogMessageFieldName)
 
 	return entity.LogRecord{
+		Source:    record.Source,
 		Level:     level,
 		Message:   messageValue,
 		Timestamp: timestamp,

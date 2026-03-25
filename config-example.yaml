@@ -41,9 +41,9 @@ processors:
   - type: json
     config:
       name: simple-json-processor
-      timestamp: timestamp
-      message: message
-      level: level
+      timestamp-field: timestamp
+      message-field: message
+      level-field: level
 
   - type: lua
     config:
