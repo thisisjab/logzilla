@@ -1,6 +1,6 @@
 # LogZilla
 
-**LogZilla is under active development. Features and APIs may change as we work towards a stable release.**
+**LogZilla is under development. Features and APIs may change as we work towards a stable release. Please help Logzilla better by opening PRs or issues with your suggestions.**
 
 ---
 
@@ -11,70 +11,49 @@ Logzilla is a lightweight, high-performance tool for collecting, processing, and
 LogZilla consists of four core components that work together to provide a complete log management solution:
 
 ### Log Source
+
 A source defines where LogZilla collects logs from. The system supports multiple source types including:
+
 - **File sources:** Tail log files with automatic rotation handling
+- **Shell commands:** Gather logs from sources like docker, journald, etc.
 - **Network sockets:** Collect logs from TCP/UDP endpoints (coming soon)
 - **Redis:** Subscribe to Redis channels for log messages (coming soon)
 - **Kafka:** Consume from Kafka topics (coming soon)
 
 ### Processor
-Processors transform raw log lines into structured, queryable data. Built-in processors include:
+
+Processors transform raw log lines into structured, queryable data. After processing, each log has a set fields including id, source, message, level (debug, info, warn, error, fatal, unknown), timestamp, and metadata. Built-in processors include:
+
 - **JSON parser:** Extract fields from JSON-formatted logs
-- **Regex extractor:** Parse custom log formats using regular expressions (coming soon)
-- **Lua processor:** Write custom processing logic using Lua scripts
+- **Lua processor:** Write custom processing logic using Lua scripts. Examples of lua processors are present at [docs/lua/script.lua](docs/lua/script.lua).
 - **Grok patterns:** Support for common log format patterns (coming soon)
 
-### Querier (coming soon)
+### Querier
+
 The querier component provides a search interface for querying processed logs. It supports:
+
 - Full-text search across all log fields
 - Time-range based queries
 - Field-specific filtering
 
-### UI (coming soon)
+### UI
+
 A modern web-based interface that enables users to:
-- Visualize log data in real-time
-- Set up alerts and notifications
+
+- Visualize log data in real-time (not real-time at the time)
+- Set up alerts and notifications (TODO)
 - Explore logs through an intuitive search interface
-- Manage configurations and processing rules
+- Manage configurations and processing rules (TODO)
 
 ## How to Install
 
-*Installation instructions will be provided in a future release.*
+Just download Logzilla suitable for you architecture from the releases section. In future a docker image will be proved for sake of simplicity.
 
 ## Basic Usage
 
 ### Configuration File Structure
 
-LogZilla uses a YAML configuration file to define the entire log processing pipeline. Here's a minimal example:
-
-```yaml
-# Basic configuration for collecting and processing application logs
-sources:
-  - name: my-application
-    type: file
-    processors: ["json-extractor"]
-    config:
-      path: "/var/log/myapp/app.log"
-
-processors:
-  - name: json-extractor
-    type: json
-    config:
-      timestamp_field: "timestamp"
-      message_field: "message"
-      level_field: "level"
-
-storage:
-  type: clickhouse
-  config:
-    addr: ["localhost:9000"]
-    database: logs
-    username: default
-    password: "your secret password"
-
-logger:
-  level: info
-```
+LogZilla uses a YAML configuration file to define the entire log processing pipeline which you can find an example of it in [`config-example.yaml`](config-example.yaml).
 
 ### Starting LogZilla
 
@@ -86,33 +65,33 @@ logzilla -config /path/to/config.yaml
 
 ### Common Operations
 
+Please refer to config-example.yaml to get better view of what can be done with Logzilla.
+
 #### 1. Tail a log file in real-time
+
 ```yaml
 sources:
-  - name: realtime-logs
-    type: file
+  - type: file
     processors: ["json-parser"]
     config:
+      name: realtime-logs
       path: "/var/log/application/current.log"
-```
 
-#### 2. Parse custom log formats with regex
-```yaml
-processors:
-  - name: apache-parser
-    type: regex
+  - type: shell
     config:
-      pattern: '^(?P<ip>\S+) \S+ \S+ \[(?P<timestamp>[^\]]+)\] "(?P<method>\S+) (?P<path>\S+) \S+" (?P<status>\d+) (?P<size>\d+)$'
-      timestamp_format: "02/Jan/2006:15:04:05 -0700"
+      name: api-logs
+      command: "python3 -u /www/your-api-server/main.py" # Use `-u` for python if you don't want python to buffer your logs.
+      processors: ["sensetive-logs-processor"]
 ```
 
-#### 3. Apply multiple processors to enrich logs
+#### 2. Apply multiple processors to enrich logs
+
 ```yaml
 sources:
-  - name: enriched-logs
-    type: file
+  - type: file
     processors: ["json-parser", "geo-enricher", "anomaly-detector"]
     config:
+    name: enriched-logs
       path: "/var/log/nginx/access.log"
 
 processors:
@@ -130,26 +109,59 @@ processors:
       script-path: "/etc/logzilla/processors/anomaly.lua"
 ```
 
-#### 4. Query logs using the command line
+#### 3. Query logs using the command line
 
-Coming soon.
+Query language of Logzilla (Quzilla) is very simple to use query language. Keep in mind that a few changes are expected to be applied to query language in order to make more easy to use.
 
-### Monitoring and Management
+Each query exists of two parts:
 
-LogZilla provides several endpoints for monitoring the system's health:
+1. **Control section:** Used to define limit, timestamp, cursor, and order of result.
+2. **Filter section:** Used to write the actual filter.
 
-Coming soon
+Control section comes first, followed by a colon, and filter section: `<control> : <filter>`
 
-```bash
-# Check system status
-curl http://localhost:8080/health
+Examples:
 
-# View processing statistics
-curl http://localhost:8080/metrics
+- `cursor=xxx sort=message : level=info,warn & (source=main-server | metadata.ip_addr="12.10.67.12")`
+- `limit=90 : message~"while calling api"`
+- `: !(message~"user registered" | level=info & metadata.success=true)`: Use single colon before queries with only filter statements.
+- `: metadata.callback_url != null`
+- `:`: Yup, single colon is allowed as well.
 
-# List active sources
-curl http://localhost:8080/api/v1/sources
-```
+#### Control section
+
+Writing control statements are easy. You have a set of fields:
+
+`sort`: Use field names with a dash to indicate descending order and omit dash for ascending order. For example: `sort=-level,source`
+
+`timestamp`: The format to define timestamp range is `timestamp=<start>,<end?>`. If start is greater than end, logs are sorted by timestamp in ascending order, otherwise logs are sorted in descending order. You can omit end timestamp which will default to now. Also keep in mind that only ISO format and `%Y:%M:%D` formats are supported for parsing timestamp.
+
+`cursor`: Cursor is used to get the next batch of current query. Syntax is `cursor=<cursor>`.
+
+`limit`: Is used to define max number of results in each batch. You can use values in range [1, 1000]. Syntax is `limit=<limit>`.
+
+All the fields in control section are optional.
+
+A real-world example of control section: `limit=10 timestamp=2020-10-12,2020-10-14`
+
+#### Filter section
+
+Use filter section to define the actual filters. Syntax is quite simple: `<field_name><operator><values>`
+
+Supported field names: `id`, `source`, `level`, `timestamp`, `message`, `metadata.<whatever>`.
+
+Supported operators:
+
+- `=`: If used with multiple values, it will not correspond to equality, and will be interpreted as IN operator.
+- `!=`: If used with multiple values, it will not correspond to equality, and will be interpreted as IN operator.
+- `~`: This is LIKE operator. It finds **strings** based on similarity. For now it doesn't support multiple values.
+- `>=`, `>`, `<`, `<=`: Used with integers and floats. Does not support multiple values for now.
+
+Values format:
+
+- Use comma as separators if you want to enter multiple values. Note that not all operators support multiple values.
+- Use parentheses to enforce order of operation.
+- Use exclamation mark as negator.
 
 ### Performance Tuning
 
@@ -157,15 +169,26 @@ For production deployments, adjust these parameters based on your workload:
 
 ```yaml
 # Increase parallelism for high-volume logs
-processor_workers_count: 50
+processor-workers-count: 50
 
 # Larger buffers for bursty traffic
-raw_logs_buffer_size: 10000
-processed_logs_buffer_size: 5000
+raw-logs-buffer-size: 10000
+processed-logs-buffer-size: 5000
 
 # More frequent flushes for real-time requirements
-storage_flush_interval: 1s
+storage-flush-interval: 1s
 ```
+
+## TODOs
+
+Logzilla is still under development. There are a couple of features that need to be improved or added:
+
+- [ ] Live trailing
+- [ ] Saving logs with failed processing job
+- [ ] Authentication, authorization, and account management for admin UI
+- [ ] Config management through UI
+- [ ] Log sources like TCP/UDP, etc.
+- [ ] Write ahead logging
 
 ## How to Contribute
 
