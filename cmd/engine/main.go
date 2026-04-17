@@ -7,9 +7,11 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/thisisjab/logzilla/config"
 	"github.com/thisisjab/logzilla/engine"
+	"github.com/thisisjab/logzilla/server"
 	"gopkg.in/yaml.v3"
 )
 
@@ -25,12 +27,12 @@ func main() {
 		panic(fmt.Errorf("cannot read config file content: %w", err))
 	}
 
-	var cfg config.Config
+	var cfg config.ConfigSchema
 	if err := yaml.Unmarshal(fileContent, &cfg); err != nil {
 		panic(fmt.Errorf("cannot parse config file: %w", err))
 	}
 
-	engineCfg, logger, err := cfg.Parse()
+	parsedCfg, logger, err := cfg.Parse()
 	if err != nil {
 		if logger != nil {
 			logger.Error("cannot parse config file", "error", err)
@@ -46,29 +48,61 @@ func main() {
 		}
 	}()
 
+	// Open storage
+	logger.Info("connecting to storage")
+	if err := parsedCfg.Storage.Open(ctx); err != nil {
+		logger.Error("cannot open connection to the storage", "error", err)
+	}
+	// Close storage
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+
+		logger.Info("closing storage connection")
+		err := parsedCfg.Storage.Close(ctx)
+		if err != nil {
+			logger.Error("cannot close storage connection", "error", err)
+		}
+
+		cancel()
+	}()
+
 	// Setup signal handling to catch Ctrl+C (SIGINT) or Terminate (SIGTERM)
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
-	// Run the engine in a separate goroutine so we can wait for signals
-	go func() {
-		sig := <-sigChan
-		logger.Info("received signal. shutting down.", "signal", sig)
-		cancel()
-	}()
-
 	// Create engine
-	engine, err := engine.New(*engineCfg, logger)
+	engine, err := engine.New(parsedCfg.EngineConfig, logger)
 	if err != nil {
 		logger.Error("engine error.", "error", err)
 		os.Exit(1)
 	}
 
-	// Run engine
-	if err := engine.Run(ctx); err != nil {
-		logger.Error("engine error.", "error", err)
-		cancel()
+	// Create api server
+	apiServer, err := server.New(parsedCfg.APIServerConfig, parsedCfg.Storage, logger)
+	if err != nil {
+		logger.Error("api server error.", "error", err)
+		os.Exit(1)
 	}
 
+	// Run engine
+	go func() {
+		if err := engine.Run(ctx); err != nil {
+			logger.Error("engine error.", "error", err)
+			cancel()
+		}
+	}()
+
+	// Run api server
+	go func() {
+		if err := apiServer.Serve(ctx); err != nil {
+			logger.Error("api server error.", "error", err)
+			cancel()
+		}
+	}()
+
+	// Wait for signal
+	sig := <-sigChan
+	logger.Info("received signal. shutting down.", "signal", sig)
+	cancel()
 	logger.Info("engine stopped.")
 }

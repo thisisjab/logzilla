@@ -9,18 +9,16 @@ import (
 	"github.com/thisisjab/logzilla/entity"
 )
 
-// Storage represents a storage interface for the engine.
-// Storage needs handle buffering by itself.
-type Storage interface {
-	Connect(ctx context.Context) error
+// EngineStorage represents a storage interface for the engine.
+// EngineStorage needs handle buffering by itself.
+type EngineStorage interface {
 	StoreProcessedLogs(ctx context.Context, logs ...entity.LogRecord) error
-	Close(ctx context.Context) error
 }
 
-// storageManager manages storage operations like inserting, buffering, and flushing logs.
+// engineStorageManager manages storage operations like inserting, buffering, and flushing logs.
 // Note that you should never disable buffering and scheduled flushing together.
-type storageManager struct {
-	storage         Storage
+type engineStorageManager struct {
+	storage         EngineStorage
 	logger          *slog.Logger
 	processedBuffer []entity.LogRecord
 	processedMutex  sync.Mutex
@@ -36,8 +34,8 @@ type storageManager struct {
 	flushInterval time.Duration
 }
 
-func newStorageManager(logger *slog.Logger, storage Storage, bufferMaxSize uint, flushInterval time.Duration) *storageManager {
-	return &storageManager{
+func newStorageManager(logger *slog.Logger, storage EngineStorage, bufferMaxSize uint, flushInterval time.Duration) *engineStorageManager {
+	return &engineStorageManager{
 		logger:          logger,
 		storage:         storage,
 		bufferMaxSize:   bufferMaxSize,
@@ -46,7 +44,7 @@ func newStorageManager(logger *slog.Logger, storage Storage, bufferMaxSize uint,
 	}
 }
 
-func (sm *storageManager) run(ctx context.Context) {
+func (sm *engineStorageManager) run(ctx context.Context) {
 	var ticker *time.Ticker
 
 	if sm.flushInterval > 0 {
@@ -74,7 +72,7 @@ func (sm *storageManager) run(ctx context.Context) {
 	}
 }
 
-func (sm *storageManager) flushBuffers(ctx context.Context) {
+func (sm *engineStorageManager) flushBuffers(ctx context.Context) {
 	var processedToFlush []entity.LogRecord
 
 	// Swap processed buffer
@@ -90,7 +88,7 @@ func (sm *storageManager) flushBuffers(ctx context.Context) {
 	}
 }
 
-func (sm *storageManager) flushProcessedLogs(ctx context.Context, toFlush []entity.LogRecord) {
+func (sm *engineStorageManager) flushProcessedLogs(ctx context.Context, toFlush []entity.LogRecord) {
 	sm.wg.Go(func() {
 		if err := sm.storage.StoreProcessedLogs(ctx, toFlush...); err != nil {
 			sm.logger.Error("failed to flush processed logs", "error", err)
@@ -101,7 +99,7 @@ func (sm *storageManager) flushProcessedLogs(ctx context.Context, toFlush []enti
 	})
 }
 
-func (sm *storageManager) addProcessedLogs(ctx context.Context, logs ...entity.LogRecord) {
+func (sm *engineStorageManager) addProcessedLogs(ctx context.Context, logs ...entity.LogRecord) {
 	if len(logs) == 0 {
 		return
 	}

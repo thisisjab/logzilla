@@ -2,16 +2,17 @@ package processor
 
 import (
 	"fmt"
+	"os"
 	"sync"
-	"time"
 
 	"github.com/thisisjab/logzilla/entity"
+	"github.com/thisisjab/logzilla/pkg/helper"
 	lua "github.com/yuin/gopher-lua"
 	luajson "layeh.com/gopher-json"
 )
 
 type LuaLogProcessorConfig struct {
-	Name       string `yaml:"-"`
+	Name       string `yaml:"name"`
 	ScriptPath string `yaml:"script-path"`
 }
 
@@ -31,6 +32,11 @@ type LuaLogProcessor struct {
 func NewLuaLogProcessor(cfg LuaLogProcessorConfig) (*LuaLogProcessor, error) {
 	if cfg.Name == "" {
 		return nil, fmt.Errorf("name cannot be empty")
+	}
+
+	_, err := os.Stat(cfg.ScriptPath)
+	if os.IsNotExist(err) || err != nil {
+		return nil, fmt.Errorf("cannot access lua script: %w", err)
 	}
 
 	pool := &sync.Pool{
@@ -103,7 +109,7 @@ func (lp *LuaLogProcessor) Process(record entity.LogRecord) (entity.LogRecord, e
 	L.Pop(4)
 
 	// Parsing outside of the Lua VM Lock
-	luaTimestamp, err := time.Parse(time.RFC3339, tsRaw)
+	luaTimestamp, err := helper.ParseDatetime(tsRaw)
 	if err != nil {
 		return record, fmt.Errorf("cannot parse timestamp '%s': %w", tsRaw, err)
 	}
@@ -119,6 +125,10 @@ func (lp *LuaLogProcessor) Process(record entity.LogRecord) (entity.LogRecord, e
 }
 
 func luaTableToMap(table *lua.LTable) map[string]any {
+	if table == nil {
+		return nil
+	}
+
 	res := make(map[string]any)
 	table.ForEach(func(key, value lua.LValue) {
 		// Lua keys are usually strings for metadata, but we ensure string conversion for the map key
