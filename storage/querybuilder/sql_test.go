@@ -10,6 +10,7 @@ import (
 )
 
 func TestClickhouseBuildWhereClause(t *testing.T) {
+	// TODO: https://github.com/thisisjab/logzilla/pull/8#discussion_r3102290376
 	timeA := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 	timeB := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 

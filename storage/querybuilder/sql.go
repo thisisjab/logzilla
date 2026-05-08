@@ -45,6 +45,7 @@ func (s *SQLQueryBuilder) BuildQuery(query ast.Query) (string, []any, error) {
 }
 
 func (s *SQLQueryBuilder) buildWhereClause(q ast.Query) (string, []any, error) {
+	// FIX: https://github.com/thisisjab/logzilla/pull/8#discussion_r3102290380
 	queryParts := make([]string, 2)
 	queryArgs := make([]any, 0)
 

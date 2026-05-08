@@ -102,6 +102,7 @@ func (l *Lexer) NextToken() token.Token {
 	return tok
 }
 
+// FIX: https://github.com/thisisjab/logzilla/pull/8#discussion_r3102290163
 func (l *Lexer) readIdentifier() token.Token {
 	pos := l.pos
 
