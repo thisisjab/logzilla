@@ -2,8 +2,8 @@ package storage
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
-	"regexp"
 	"time"
 
 	"github.com/ClickHouse/clickhouse-go/v2"
@@ -11,9 +11,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/thisisjab/logzilla/entity"
 	"github.com/thisisjab/logzilla/querier"
+	"github.com/thisisjab/logzilla/storage/querybuilder"
 )
-
-var allowedFieldsRegex = regexp.MustCompile(`^(id|level|timestamp|message|source|metadata(\.("[^"]+"|[a-zA-Z0-9_]+))?)$`)
 
 type ClickHouseStorageConfig struct {
 	Addr     []string `yaml:"addr"`
@@ -24,22 +23,15 @@ type ClickHouseStorageConfig struct {
 
 // TODO: add support for printing generated/executed queries (both for insert and select)
 type ClickHouseStorage struct {
-	conn  clickhouse.Conn
-	cfg   ClickHouseStorageConfig
-	query *querier.SQLQueryBuilder
+	queryBuilder *querybuilder.SQLQueryBuilder
+	conn         clickhouse.Conn
+	cfg          ClickHouseStorageConfig
 }
 
 func NewClickHouseStorage(cfg ClickHouseStorageConfig) (*ClickHouseStorage, error) {
-	queryBuilder := querier.NewSQLQueryBuilder(querier.SQLOptions{
-		TableName:                "processed_logs",
-		SelectColumns:            []string{"id", "source", "timestamp", "level", "message", "metadata"},
-		AllowedSortFields:        []string{"source", "level", "timestamp"},
-		AllowedFilterFieldsRegex: allowedFieldsRegex,
-	})
-
 	return &ClickHouseStorage{
-		cfg:   cfg,
-		query: queryBuilder,
+		queryBuilder: querybuilder.NewSQLQueryBuilder(),
+		cfg:          cfg,
 	}, nil
 }
 
@@ -80,7 +72,7 @@ func setupClickHouseTables(ctx context.Context, conn driver.Conn) error {
 	return err
 }
 
-func (s *ClickHouseStorage) Connect(ctx context.Context) error {
+func (s *ClickHouseStorage) Open(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
@@ -139,7 +131,7 @@ func (s *ClickHouseStorage) StoreRawLogs(ctx context.Context, logs ...entity.Log
 	}
 
 	for _, log := range logs {
-		err = batch.Append(uuid.New(), log.Source, log.Timestamp, log.Level, log.RawData)
+		err = batch.Append(uuid.New(), log.Source, log.Timestamp, int(log.Level), log.RawData)
 
 		if err != nil {
 			return fmt.Errorf("couldn't append log to batch: %w", err)
@@ -168,7 +160,12 @@ func (s *ClickHouseStorage) StoreProcessedLogs(ctx context.Context, logs ...enti
 	}
 
 	for _, log := range logs {
-		err = batch.Append(log.ID, log.Source, log.Timestamp, log.Level, log.Message, log.Metadata)
+		m, err := json.Marshal(log.Metadata)
+		if err != nil {
+			return fmt.Errorf("cannot marshal log metadata: %w", err)
+		}
+
+		err = batch.Append(log.ID, log.Source, log.Timestamp, int(log.Level), log.Message, m)
 
 		if err != nil {
 			return fmt.Errorf("couldn't append log to batch: %w", err)
@@ -183,78 +180,50 @@ func (s *ClickHouseStorage) StoreProcessedLogs(ctx context.Context, logs ...enti
 	return nil
 }
 
-func (s *ClickHouseStorage) Query(ctx context.Context, req querier.QueryRequest) (querier.QueryResponse, error) {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+func (s *ClickHouseStorage) Query(ctx context.Context, req querier.QueryRequest) (*querier.QueryResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	// Build the SQL query using the generic query builder
-	result, err := s.query.Build(req.Query)
+	q, args, err := s.queryBuilder.BuildQuery(req.Query)
 	if err != nil {
-		return querier.QueryResponse{}, fmt.Errorf("failed to build query: %w", err)
+		return nil, fmt.Errorf("cannot construct query: %w", err)
 	}
 
-	// Execute the query
-	rows, err := s.conn.Query(ctx, result.Query, result.Args...)
+	rows, err := s.conn.Query(ctx, q, args...)
 	if err != nil {
-		return querier.QueryResponse{}, fmt.Errorf("failed to execute query: %w", err)
+		return nil, fmt.Errorf("cannot query database: %w", err)
 	}
 	defer rows.Close()
 
-	// Scan results
-	records, err := scanLogRecords(rows)
+	logs, err := s.scanRows(rows)
 	if err != nil {
-		return querier.QueryResponse{}, fmt.Errorf("failed to scan results: %w", err)
+		return nil, fmt.Errorf("cannot scan rows: %w", err)
 	}
 
-	return querier.QueryResponse{
-		Records: records,
-		Cursor:  "", // TODO: Implement cursor-based pagination
-	}, nil
+	cursor := ""
+	if len(logs) > 0 {
+		cursor = logs[len(logs)-1].ID.String()
+	}
+
+	return &querier.QueryResponse{Records: logs, Cursor: cursor}, nil
 }
 
-func scanLogRecords(rows driver.Rows) ([]entity.LogRecord, error) {
-	var records []entity.LogRecord
+func (s *ClickHouseStorage) scanRows(rows driver.Rows) ([]entity.LogRecord, error) {
+	logs := make([]entity.LogRecord, 0)
 
 	for rows.Next() {
-		var record entity.LogRecord
-		var levelStr string
+		var r entity.LogRecord
+		var logLevel string
 
-		err := rows.Scan(
-			&record.ID,
-			&record.Source,
-			&record.Timestamp,
-			&levelStr,
-			&record.Message,
-			&record.Metadata,
-		)
+		err := rows.Scan(&r.ID, &r.Source, &logLevel, &r.Message, &r.Timestamp, &r.Metadata)
 		if err != nil {
-			return nil, fmt.Errorf("failed to scan row: %w", err)
+			return nil, fmt.Errorf("rows scan error: %w", err)
 		}
 
-		record.Level = parseLogLevel(levelStr)
-		records = append(records, record)
+		r.Level = parseLogLevel(logLevel)
+
+		logs = append(logs, r)
 	}
 
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("row iteration error: %w", err)
-	}
-
-	return records, nil
-}
-
-func parseLogLevel(level string) entity.LogLevel {
-	switch level {
-	case "DEBUG":
-		return entity.LogLevelDebug
-	case "INFO":
-		return entity.LogLevelInfo
-	case "WARN":
-		return entity.LogLevelWarn
-	case "ERROR":
-		return entity.LogLevelError
-	case "FATAL":
-		return entity.LogLevelFatal
-	default:
-		return entity.LogLevelUnknown
-	}
+	return logs, nil
 }

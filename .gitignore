@@ -29,3 +29,12 @@ go.work.sum
 .vscode/
 
 .config.yaml
+
+# UI Files (These need to be built in each build)
+server/ui/index.html
+server/ui/icons.svg
+server/ui/favicon.svg
+server/ui/static
+
+# Built binaries
+bin/

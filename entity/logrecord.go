@@ -18,7 +18,7 @@ const (
 )
 
 func (l LogLevel) String() string {
-	return [...]string{"UNKNOWN", "DEBUG", "INFO", "WARN", "ERROR", "FATAL"}[l]
+	return [...]string{"unknown", "debug", "info", "warn", "error", "fatal"}[l]
 }
 
 // LogRecord represents a log record received from a log source.

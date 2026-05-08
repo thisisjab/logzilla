@@ -3,7 +3,6 @@ package engine
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"sync"
 	"time"
@@ -14,7 +13,7 @@ import (
 type Config struct {
 	Sources                    []LogSource
 	Processors                 []LogProcessor
-	Storage                    Storage
+	Storage                    EngineStorage
 	StorageFlushInterval       time.Duration
 	RawLogsBufferMaxSize       uint
 	ProcessedLogsBufferMaxSize uint
@@ -25,7 +24,7 @@ type Config struct {
 type Engine struct {
 	cfg            Config
 	logger         *slog.Logger
-	storageManager *storageManager
+	storageManager *engineStorageManager
 }
 
 func New(cfg Config, logger *slog.Logger) (*Engine, error) {
@@ -66,12 +65,6 @@ func (c Config) validate() error {
 }
 
 func (e *Engine) Run(ctx context.Context) error {
-	// Connect to database
-	err := e.cfg.Storage.Connect(ctx)
-	if err != nil {
-		return fmt.Errorf("cannot establish a connection to the storage: %w", err)
-	}
-
 	// Start consuming logs from all sources.
 	// rawLogs will contain all raw logs from all sources.
 	rawLogs := e.consumeLogs(ctx)
@@ -90,11 +83,6 @@ func (e *Engine) Run(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			wg.Wait()
-
-			err := e.cfg.Storage.Close(ctx)
-			if err != nil {
-				return fmt.Errorf("cannot close the storage connection: %w", err)
-			}
 
 			return ctx.Err()
 		case p, ok := <-processedLogs:

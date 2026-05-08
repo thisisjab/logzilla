@@ -1,5 +1,7 @@
 # TODOs
 
+**Note:** Items with `*` have slightly higher precedence.
+
 - [ ] Support for saving unprocessed logs (due to processor failure)
 - [ ] Add job for re-processing failed logs
 - [ ] Introduce WAL to avoid data loss
@@ -17,7 +19,6 @@
 ## Processors
 
 - [ ] Add fastjson processor
-- [ ] Add regex processor
 
 ## Engine
 
@@ -37,8 +38,12 @@
 
 ## UI
 
-- [ ] Add basic UI functionality
+- [x] Add basic UI functionality
 
-## Querier
+## Querier (Done)
 
-- [ ] Research about options
+- [x] Research about options
+
+## Server
+
+- [ ] * Add support for live trailing
