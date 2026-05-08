@@ -52,6 +52,7 @@ func main() {
 	logger.Info("connecting to storage")
 	if err := parsedCfg.Storage.Open(ctx); err != nil {
 		logger.Error("cannot open connection to the storage", "error", err)
+		os.Exit(1)
 	}
 	// Close storage
 	defer func() {
@@ -71,7 +72,7 @@ func main() {
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
 	// Create engine
-	engine, err := engine.New(parsedCfg.EngineConfig, logger)
+	eng, err := engine.New(parsedCfg.EngineConfig, logger)
 	if err != nil {
 		logger.Error("engine error.", "error", err)
 		os.Exit(1)
@@ -86,7 +87,7 @@ func main() {
 
 	// Run engine
 	go func() {
-		if err := engine.Run(ctx); err != nil {
+		if err := eng.Run(ctx); err != nil {
 			logger.Error("engine error.", "error", err)
 			cancel()
 		}
@@ -101,8 +102,14 @@ func main() {
 	}()
 
 	// Wait for signal
-	sig := <-sigChan
-	logger.Info("received signal. shutting down.", "signal", sig)
-	cancel()
-	logger.Info("engine stopped.")
+	select {
+	case sig := <-sigChan:
+		logger.Info("received signal. shutting down.", "signal", sig)
+		cancel()
+		logger.Info("engine stopped.")
+	case <-ctx.Done():
+		logger.Info("running cancelled.")
+		logger.Info("engine stopped.")
+	}
+
 }
