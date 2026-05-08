@@ -82,7 +82,7 @@ func (p *Parser) parseValues() []any {
 			values = append(values, num)
 
 		case token.DECIMAL:
-			num, err := strconv.ParseFloat(p.curToken.Literal, 32)
+			num, err := strconv.ParseFloat(p.curToken.Literal, 64)
 			if err != nil {
 				panic(fmt.Errorf("cannot parse %s to a valid decimal", p.curToken.Literal))
 			}
