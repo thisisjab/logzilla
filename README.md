@@ -1,4 +1,4 @@
-# LogZilla
+# 🦞 LogZilla
 
 **LogZilla is under development. Features and APIs may change as we work towards a stable release. Please help Logzilla better by opening PRs or issues with your suggestions.**
 
@@ -54,6 +54,8 @@ Just download Logzilla suitable for you architecture from the releases section. 
 ## Basic Usage
 
 ### Configuration File Structure
+
+**Note:** README might be out of sync right now. Consider going through `config-example.yaml`.
 
 LogZilla uses a YAML configuration file to define the entire log processing pipeline which you can find an example of it in [`config-example.yaml`](config-example.yaml).
 
