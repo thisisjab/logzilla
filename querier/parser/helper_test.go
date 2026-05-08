@@ -83,7 +83,7 @@ func TestParseValues(t *testing.T) {
 		}
 
 		if p.peekToken.Type != token.EOF {
-			t.Fatalf("[%d] expected EOF, but got `%s (%s)`", i, p.curToken.Literal, p.curToken.Type.String())
+			t.Fatalf("[%d] expected EOF, but got `%s (%s)`", i, p.peekToken.Literal, p.peekToken.Type.String())
 		}
 
 		if len(p.errors) != 0 {

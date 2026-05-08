@@ -59,7 +59,7 @@ func (p *Parser) parseSingleSortField() (ast.SortField, error) {
 		s.Name = p.curToken.Literal
 		s.IsDescending = true
 	default:
-		return s, fmt.Errorf("unexpected token of type `%s`", p.peekToken.Type.String())
+		return s, fmt.Errorf("unexpected token of type `%s`", p.curToken.Type.String())
 	}
 
 	return s, nil
