@@ -57,6 +57,10 @@ func (s *server) Serve(ctx context.Context) error {
 	srv := &http.Server{
 		Addr:    s.cfg.Addr,
 		Handler: s.routes(),
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       120 * time.Second,
 	}
 
 	go func() {
