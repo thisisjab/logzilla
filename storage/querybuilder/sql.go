@@ -231,6 +231,7 @@ func (s *SQLQueryBuilder) buildLimitClause(q ast.Query) (string, []any, error) {
 	return "LIMIT ?", []any{q.Limit}, nil
 }
 
+// TODO: update to return errors for unknown levels
 func normalizeLevel(values []any) {
 	for i, v := range values {
 		s := strings.ToLower(fmt.Sprint(v))
