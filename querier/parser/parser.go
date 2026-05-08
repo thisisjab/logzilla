@@ -64,6 +64,7 @@ func (p *Parser) ParseQuery() (*ast.Query, error) {
 
 	isParsingFilterSection := false
 
+	// FIX: https://github.com/thisisjab/logzilla/pull/8#discussion_r3102290290
 	for p.curToken.Type != token.EOF {
 		if p.curToken.Type == token.ILLEGAL {
 			return nil, fault.New(fault.BadInputCode, "Illegal token.").WithMetadata(fault.FieldErrorsMetadata{"query": []string{fmt.Sprintf("illegal token: %s", p.curToken.Literal)}})

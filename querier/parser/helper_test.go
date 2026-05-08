@@ -78,7 +78,7 @@ func TestParseValues(t *testing.T) {
 
 		for j := range result {
 			if result[j] != tc.expected[j] {
-				t.Fatalf("[%d] expected result[%d] be `%+v`, but it's `%v`", i, j, result[j], tc.expected[j])
+				t.Fatalf("[%d] expected result[%d] to be `%+v`, but got `%+v`", i, j, tc.expected[j], result[j])
 			}
 		}
 
