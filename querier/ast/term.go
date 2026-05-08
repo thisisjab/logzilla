@@ -152,27 +152,22 @@ func nodesEqual(a, b Term) bool {
 	if a == nil || b == nil {
 		return a == b
 	}
-
 	switch nodeA := a.(type) {
-	case *ComparisonTerm:
-		nodeB, ok := b.(*ComparisonTerm)
+	case ComparisonTerm:
+		nodeB, ok := b.(ComparisonTerm)
 		return ok &&
 			nodeA.FieldName == nodeB.FieldName &&
 			nodeA.Operator == nodeB.Operator &&
 			reflect.DeepEqual(nodeA.Values, nodeB.Values)
-
-	case *AndTerm:
-		nodeB, ok := b.(*AndTerm)
+	case AndTerm:
+		nodeB, ok := b.(AndTerm)
 		return ok && nodesEqual(nodeA.Left, nodeB.Left) && nodesEqual(nodeA.Right, nodeB.Right)
-
-	case *OrTerm:
-		nodeB, ok := b.(*OrTerm)
+	case OrTerm:
+		nodeB, ok := b.(OrTerm)
 		return ok && nodesEqual(nodeA.Left, nodeB.Left) && nodesEqual(nodeA.Right, nodeB.Right)
-
-	case *NotNode:
-		nodeB, ok := b.(*NotNode)
+	case NotNode:
+		nodeB, ok := b.(NotNode)
 		return ok && nodesEqual(nodeA.Term, nodeB.Term)
-
 	default:
 		return reflect.DeepEqual(a, b)
 	}
