@@ -35,7 +35,7 @@ func NewLuaLogProcessor(cfg LuaLogProcessorConfig) (*LuaLogProcessor, error) {
 	}
 
 	_, err := os.Stat(cfg.ScriptPath)
-	if os.IsNotExist(err) || err != nil {
+	if os.IsNotExist(err) {
 		return nil, fmt.Errorf("cannot access lua script: %w", err)
 	}
 
