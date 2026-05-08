@@ -80,6 +80,7 @@ func (s *SQLQueryBuilder) buildWhereClause(q ast.Query) (string, []any, error) {
 	// and if cursor is present: id > c
 
 	// cursor
+	// WARN: check https://github.com/thisisjab/logzilla/pull/8#discussion_r3102290387
 	if q.Cursor != "" {
 		if q.Start.After(q.End) {
 			queryParts = append(queryParts, `(id < ?)`)
