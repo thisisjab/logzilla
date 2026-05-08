@@ -117,26 +117,26 @@ func TestQueryEquality(t *testing.T) {
 		// Start and end
 		{
 			// Same start, no end
-			Query{Start: time.Date(2000, 0, 0, 0, 0, 0, 0, time.UTC)},
-			Query{Start: time.Date(2000, 0, 0, 0, 0, 0, 0, time.UTC)},
+			Query{Start: time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)},
+			Query{Start: time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)},
 			true,
 		},
 		{
 			// Different start, no end
-			Query{Start: time.Date(2000, 0, 0, 0, 0, 0, 0, time.UTC)},
-			Query{Start: time.Date(1999, 0, 0, 0, 0, 0, 0, time.UTC)},
+			Query{Start: time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)},
+			Query{Start: time.Date(1999, 1, 1, 0, 0, 0, 0, time.UTC)},
 			false,
 		},
 		{
 			// No start, same end
-			Query{End: time.Date(2000, 0, 0, 0, 0, 0, 0, time.UTC)},
-			Query{End: time.Date(2000, 0, 0, 0, 0, 0, 0, time.UTC)},
+			Query{End: time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)},
+			Query{End: time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)},
 			true,
 		},
 		{
 			// No start, different end
-			Query{End: time.Date(2000, 0, 0, 0, 0, 0, 0, time.UTC)},
-			Query{End: time.Date(1999, 0, 0, 0, 0, 0, 0, time.UTC)},
+			Query{End: time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)},
+			Query{End: time.Date(1999, 1, 1, 0, 0, 0, 0, time.UTC)},
 			false,
 		},
 		// Misc
