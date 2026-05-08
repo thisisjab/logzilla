@@ -67,7 +67,9 @@ func (s *server) Serve(ctx context.Context) error {
 		<-ctx.Done()
 
 		s.logger.Info("shutting down server", "addr", s.cfg.Addr)
-		if err := srv.Shutdown(ctx); err != nil {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if err := srv.Shutdown(shutdownCtx); err != nil {
 			s.logger.Error("failed to shutdown server properly", "addr", s.cfg.Addr, "error", err)
 		}
 	}()
