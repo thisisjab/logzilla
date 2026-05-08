@@ -111,9 +111,6 @@ func (s *ClickHouseStorage) Open(ctx context.Context) error {
 }
 
 func (s *ClickHouseStorage) Close(ctx context.Context) error {
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-
 	return s.conn.Close()
 }
 
@@ -193,7 +190,9 @@ func (s *ClickHouseStorage) Query(ctx context.Context, req querier.QueryRequest)
 	if err != nil {
 		return nil, fmt.Errorf("cannot query database: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	logs, err := s.scanRows(rows)
 	if err != nil {

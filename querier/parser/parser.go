@@ -209,7 +209,7 @@ func (p *Parser) parseLimit(q *ast.Query) error {
 
 	limit, err := strconv.Atoi(p.curToken.Literal)
 	if err != nil {
-		return fmt.Errorf("cannot parse limit value: `%s` is not a valid integer.", p.curToken.Literal)
+		return fmt.Errorf("cannot parse limit value: `%s` is not a valid integer", p.curToken.Literal)
 	}
 
 	q.Limit = limit

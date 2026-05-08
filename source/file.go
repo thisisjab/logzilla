@@ -54,7 +54,10 @@ func (f *FileLogSource) Provide(ctx context.Context, logChan chan<- entity.LogRe
 	if err != nil {
 		return fmt.Errorf("cannot open file: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		err := file.Close()
+		if err != nil {f.logger.Warn("error when closing the file", "error", err)}
+	} ()
 
 	// Always seek to the end of the file
 	// Note that when file is read (when notified by fsnotify), the cursor will move to end of file
@@ -67,7 +70,10 @@ func (f *FileLogSource) Provide(ctx context.Context, logChan chan<- entity.LogRe
 	if err != nil {
 		return fmt.Errorf("cannot create watcher: %w", err)
 	}
-	defer watcher.Close()
+	defer func() {
+		err := watcher.Close()
+		if err != nil {f.logger.Warn("error when closing the watcher", "error", err)}
+	}()
 
 	if err := watcher.Add(f.cfg.FilePath); err != nil {
 		return fmt.Errorf("cannot add file to watcher: %w", err)

@@ -226,7 +226,7 @@ func (s *SQLQueryBuilder) buildLimitClause(q ast.Query) (string, []any, error) {
 		q.Limit = 100
 	}
 
-	if !(q.Limit >= 1 && q.Limit <= 1000) {
+	if q.Limit < 1 || q.Limit > 1000 {
 		return "", nil, fmt.Errorf("limit value is not in range [1, 1000]")
 	}
 

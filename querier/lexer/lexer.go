@@ -106,11 +106,8 @@ func (l *Lexer) NextToken() token.Token {
 func (l *Lexer) readIdentifier() token.Token {
 	pos := l.pos
 
-	for {
+	for l.char != 0 && !isWhitespace(l.char) &&  l.char != ',' && !isOperator(l.char){
 		// Stop if we hit a boundary: space, comma, EOF, or an operator (=, &, |, etc.)
-		if l.char == 0 || isWhitespace(l.char) || l.char == ',' || isOperator(l.char) {
-			break
-		}
 		l.readChar()
 	}
 
