@@ -4,6 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "test": "echo OK",
     "dev": "vite",
     "build": "tsc -b && vite build --outDir ../server/ui --assetsDir static",
     "lint": "eslint .",
