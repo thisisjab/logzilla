@@ -86,6 +86,7 @@ func (o ComparisonOperator) String() string {
 		OperatorGte:   ">=",
 		OperatorLte:   "<=",
 		OperatorILike: "~",
+		// Add LIKE operator
 	}[o]
 }
 

@@ -42,20 +42,20 @@ type SortField struct {
 	IsDescending bool `json:"is_descending"`
 }
 
-func (r Query) Validate() error {
+func (q Query) Validate() error {
 	// MAYBE: In future we may want to read these from configs.
 	const LimitMin = 1
 	const LimitMax = 1000
 
-	if r.Limit > LimitMax {
+	if q.Limit > LimitMax {
 		return fault.New(fault.BadInputCode, "").WithMetadata(fault.FieldErrorsMetadata{"limit": []string{fmt.Sprintf("Values larger than %d are not supported.", LimitMax)}})
 	}
 
-	if r.Limit < LimitMin {
+	if q.Limit < LimitMin {
 		return fault.New(fault.BadInputCode, "").WithMetadata(fault.FieldErrorsMetadata{"limit": []string{fmt.Sprintf("Values smaller than %d are not supported.", LimitMin)}})
 	}
 
-	if r.Start.IsZero() {
+	if q.Start.IsZero() {
 		return fault.New(fault.BadInputCode, "").WithMetadata(fault.FieldErrorsMetadata{"start": []string{"Field is required."}})
 	}
 
