@@ -7,7 +7,7 @@ engine:
   # Max number of buffered logs before being flushed to the storage - setting this to zero will disable buffering
   processed-logs-buffer-size: 10
   # Max wait duration before flushing buffered logs to the storage -setting this to zero will disable periodic flushing
-  storage-flush-interval: 10s # Inter
+  storage-flush-interval: 10s
 
 # Storage defines the actual database that stores logs. For now only clickhouse is supported.
 # Timescaledb, mongodb, etc. will be added as storage services in future.
@@ -47,24 +47,24 @@ processors:
 
   - type: lua
     config:
-      name: sensetive-logs-processor
+      name: sensitive-logs-processor
       script-path: /path/to/your-script.lua
 
 sources:
   # Use file source to read logs from file.
   # Rotating file support will be added in future.
   - type: file
-    processors: ["simple-json-processor"]
     config:
       name: caddy-logs
       path: "/path/to/your-logs.json"
+      processors: ["simple-json-processor"]
 
   # Use shell source to read logs from docker, journald, etc.
   - type: shell
     config:
       name: api-logs
       command: "python3 -u /www/your-api-server/main.py" # Use `-u` for python if you don't want python to buffer your logs.
-      processors: ["sensetive-logs-processor"]
+      processors: ["sensitive-logs-processor"]
 
 # Logger configuration for Logzilla itself
 logger:

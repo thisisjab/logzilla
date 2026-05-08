@@ -104,6 +104,7 @@ func main() {
 	// Wait for signal
 	select {
 	case sig := <-sigChan:
+		// TODO: add wait for better graceful shutdowns
 		logger.Info("received signal. shutting down.", "signal", sig)
 		cancel()
 		logger.Info("engine stopped.")
