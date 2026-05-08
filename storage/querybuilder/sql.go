@@ -122,7 +122,7 @@ func (s *SQLQueryBuilder) parseRootTerm(term ast.Term) (string, []any, error) {
 
 		right, rightArgs, err := s.parseRootTerm(term.Right)
 		if err != nil {
-			return "", nil, fmt.Errorf("cannot parse `and` term due to errors with right: %w", err)
+			return "", nil, fmt.Errorf("cannot parse `or` term due to errors with right: %w", err)
 		}
 
 		allArgs := leftArgs
