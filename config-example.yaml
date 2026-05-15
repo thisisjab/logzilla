@@ -63,7 +63,7 @@ sources:
   - type: shell
     config:
       name: api-logs
-      command: "python3 -u /www/your-api-server/main.py" # Use `-u` for python if you don't want python to buffer your logs.
+      command: ["python3", "-u", "/www/your-api-server/main.py"] # Use `-u` for python if you don't want python to buffer your logs.
       processors: ["sensitive-logs-processor"]
 
 # Logger configuration for Logzilla itself

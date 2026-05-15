@@ -15,7 +15,7 @@ import (
 
 type ShellLogSourceConfig struct {
 	Name           string   `yaml:"name"`
-	Command        string   `yaml:"command"`
+	Command        []string `yaml:"command"`
 	ProcessorNames []string `yaml:"processors"`
 }
 
@@ -27,11 +27,7 @@ type ShellLogSource struct {
 }
 
 func NewShellLogSource(logger *slog.Logger, cfg ShellLogSourceConfig) (*ShellLogSource, error) {
-	if cfg.Name == "" {
-		return nil, fmt.Errorf("name cannot be empty")
-	}
-
-	if cfg.Command == "" {
+	if len(cfg.Command) < 1 {
 		return nil, fmt.Errorf("command cannot be empty")
 	}
 
@@ -40,13 +36,11 @@ func NewShellLogSource(logger *slog.Logger, cfg ShellLogSourceConfig) (*ShellLog
 		cfg:    cfg,
 	}
 
-	parts := strings.Fields(cfg.Command)
-
-	if len(parts) > 1 {
-		s.cmdName = parts[0]
-		s.cmdArgs = parts[1:]
-	} else if len(parts) == 1 {
-		s.cmdName = parts[0]
+	if len(cfg.Command) > 1 {
+		s.cmdName = cfg.Command[0]
+		s.cmdArgs = cfg.Command[1:]
+	} else if len(cfg.Command) == 1 {
+		s.cmdName = cfg.Command[0]
 		s.cmdArgs = make([]string, 0)
 	} else {
 		return nil, fmt.Errorf("cannot run processor with an empty command")
