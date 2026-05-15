@@ -20,6 +20,7 @@ vendor/
 # Go workspace file
 go.work
 go.work.sum
+**/__debug_*
 
 # env file
 .env

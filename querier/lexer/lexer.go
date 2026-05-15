@@ -102,11 +102,10 @@ func (l *Lexer) NextToken() token.Token {
 	return tok
 }
 
-// FIX: https://github.com/thisisjab/logzilla/pull/8#discussion_r3102290163
 func (l *Lexer) readIdentifier() token.Token {
 	pos := l.pos
 
-	for l.char != 0 && !isWhitespace(l.char) &&  l.char != ',' && !isOperator(l.char){
+	for l.char != 0 && !isWhitespace(l.char) &&  l.char != ',' && l.char != '"' && !isOperator(l.char){
 		// Stop if we hit a boundary: space, comma, EOF, or an operator (=, &, |, etc.)
 		l.readChar()
 	}

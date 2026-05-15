@@ -1,11 +1,13 @@
 package parser
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/thisisjab/logzilla/pkg/fault"
 	"github.com/thisisjab/logzilla/querier/ast"
 	"github.com/thisisjab/logzilla/querier/lexer"
 	"github.com/thisisjab/logzilla/querier/token"
@@ -348,6 +350,51 @@ func TestParseIdentifier(t *testing.T) {
 
 		if p.curToken.Type != token.EOF {
 			t.Fatalf("Expected EOF token, got %v", p.curToken)
+		}
+
+	}
+}
+
+// TestFailingParseQuery tests for the cases that parse query func. must fail.
+func TestFailingParseQuery(t *testing.T) {
+	tests := []struct {
+		q           string
+		expectedErr fault.Fault
+	}{
+		{
+			q:           ": level=1 level=2", // there is not & or | between two clauses
+			expectedErr: fault.New(fault.BadInputCode, "").WithMetadata(fault.FieldErrorsMetadata{"query": []string{"unexpected token or clause: IDENT"}}),
+		},
+		{
+			q:           "timestamp = :",
+			expectedErr: fault.New(fault.BadInputCode, "").WithMetadata(fault.FieldErrorsMetadata{"query": []string{"error when parsing `timestamp`: expected token of type `STRING`, but got COLON (literal=`:`)"}}),
+		},
+		{
+			q:           ": message ~ not \" terminated",
+			expectedErr: fault.New(fault.BadInputCode, "").WithMetadata(fault.FieldErrorsMetadata{"query": []string{"unexpected token or clause: STRING"}}),
+		},
+	}
+
+	var l *lexer.Lexer
+	var p *Parser
+	for i, tc := range tests {
+		l = lexer.New(tc.q)
+		p = New(l)
+
+		_, err := p.ParseQuery()
+		if err == nil {
+			t.Errorf("[%d] parse query didn't fail: %s", i, tc.q)
+		} else {
+			var f fault.Fault
+			if errors.As(err, &f) {
+
+				if !f.Equals(tc.expectedErr) {
+					t.Errorf("[%d] didn't get expected error:\nexpected: %+v\ngot: %+v", i, tc.expectedErr.Metadata(), f.Metadata())
+				}
+
+			} else {
+				t.Errorf("[%d] expected Fault, but got type %T", i, err)
+			}
 		}
 
 	}

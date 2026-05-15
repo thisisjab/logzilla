@@ -10,7 +10,6 @@ import (
 )
 
 func TestClickhouseBuildWhereClause(t *testing.T) {
-	// TODO: https://github.com/thisisjab/logzilla/pull/8#discussion_r3102290376
 	timeA := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 	timeB := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 
@@ -54,6 +53,15 @@ func TestClickhouseBuildWhereClause(t *testing.T) {
 			},
 			expectedClause: "WHERE (level = ?) AND (timestamp BETWEEN ? AND ?) AND (id > ?)",
 			expectedArgs:   []any{1, timeA, timeB, "x"},
+		},
+		{
+			input: ast.Query{
+				Root:   ast.ComparisonTerm{FieldName: "level", Operator: ast.OperatorEq, Values: []any{1}},
+				Start:  timeA,
+				Cursor: "x",
+			},
+			expectedClause: "WHERE (level = ?) AND (timestamp >= ?) AND (id > ?)",
+			expectedArgs:   []any{1, timeA, "x"},
 		},
 		{
 			input: ast.Query{

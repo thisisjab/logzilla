@@ -10,6 +10,10 @@ import (
 	"github.com/thisisjab/logzilla/querier/token"
 )
 
+var terminators = []token.TokenType{
+	token.EOF, token.RPAREN, token.COMMA,
+}
+
 func (p *Parser) addError(err error) {
 	p.errors = append(p.errors, err)
 }
