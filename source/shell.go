@@ -2,6 +2,7 @@ package source
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -73,13 +74,12 @@ func (s *ShellLogSource) Provide(ctx context.Context, logChan chan<- entity.LogR
 		return fmt.Errorf("cannot start command `%s` with given args (%s): %w", s.cmdName, strings.Join(s.cmdArgs, ", "), err)
 	}
 
-	// FIX: https://github.com/thisisjab/logzilla/pull/8#discussion_r3102283981
 	scannerStdout := bufio.NewScanner(stdout)
 	go func() {
 		for scannerStdout.Scan() {
 			logChan <- entity.LogRecord{
 				Source:    s.Name(),
-				RawData:   scannerStdout.Bytes(),
+				RawData:   bytes.Clone(scannerStdout.Bytes()),
 				Timestamp: time.Now(),
 			}
 		}
@@ -90,7 +90,7 @@ func (s *ShellLogSource) Provide(ctx context.Context, logChan chan<- entity.LogR
 		for scannerStderr.Scan() {
 			logChan <- entity.LogRecord{
 				Source:    s.Name(),
-				RawData:   scannerStderr.Bytes(),
+				RawData:   bytes.Clone(scannerStderr.Bytes()),
 				Timestamp: time.Now(),
 			}
 		}
