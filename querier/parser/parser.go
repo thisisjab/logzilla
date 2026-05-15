@@ -2,6 +2,7 @@ package parser
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 
 	"github.com/thisisjab/logzilla/pkg/fault"
@@ -64,7 +65,6 @@ func (p *Parser) ParseQuery() (*ast.Query, error) {
 
 	isParsingFilterSection := false
 
-	// FIX: https://github.com/thisisjab/logzilla/pull/8#discussion_r3102290290
 	for p.curToken.Type != token.EOF {
 		if p.curToken.Type == token.ILLEGAL {
 			return nil, fault.New(fault.BadInputCode, "Illegal token.").WithMetadata(fault.FieldErrorsMetadata{"query": []string{fmt.Sprintf("illegal token: %s", p.curToken.Literal)}})
@@ -107,7 +107,7 @@ func (p *Parser) parseFilterStatement(q *ast.Query) error {
 func (p *Parser) parseStatement(precedence int) (ast.Term, error) {
 	nud, exists := p.nudParseFns[p.curToken.Type]
 	if !exists {
-		panic(fmt.Errorf("no nud parse function for token type: `%v`", p.curToken.Type))
+		return nil, fmt.Errorf("no nud parse function for token type: `%v`", p.curToken.Type)
 	}
 
 	leftExp, err := nud()
@@ -115,11 +115,24 @@ func (p *Parser) parseStatement(precedence int) (ast.Term, error) {
 		return nil, fmt.Errorf("cannot parse token: %w", err)
 	}
 
-	for precedenceMap[p.peekToken.Type] > precedence {
+	for {
+		nextPrec, exists := precedenceMap[p.peekToken.Type]
+		if !exists {
+			// Valid terminators (EOF, RPAREN, COMMA, control keywords) should not error
+			if slices.Contains(terminators, p.peekToken.Type) {
+				break
+			}
+			return nil, fmt.Errorf("unexpected token or clause: %v", p.peekToken.Type)
+		}
+
+		if nextPrec <= precedence {
+			break
+		}
+
 		p.nextToken()
 		led, exists := p.ledParseFns[p.curToken.Type]
 		if !exists {
-			panic(fmt.Errorf("no led parse function for token type: `%v`", p.curToken.Type))
+			return nil, fmt.Errorf("no led parse function for token type: `%v`", p.curToken.Type)
 		}
 
 		leftExp, err = led(leftExp, precedence)
@@ -209,7 +222,7 @@ func (p *Parser) parseLimit(q *ast.Query) error {
 
 	limit, err := strconv.Atoi(p.curToken.Literal)
 	if err != nil {
-		return fmt.Errorf("cannot parse limit value: `%s` is not a valid integer", p.curToken.Literal)
+		return fmt.Errorf("cannot parse limit value: `%s` is not a valid integer: %w", p.curToken.Literal, err)
 	}
 
 	q.Limit = limit

@@ -1,6 +1,10 @@
 package fault
 
-import "fmt"
+import (
+	"fmt"
+	"reflect"
+	"strings"
+)
 
 type faultCode string
 
@@ -12,6 +16,16 @@ const (
 )
 
 type FieldErrorsMetadata map[string][]string
+
+func (f FieldErrorsMetadata) String () string {
+	result := ""
+
+	for k := range f {
+		result += fmt.Sprintf("%s = %s", k, strings.Join(f[k], ", "))
+	}
+
+	return  result
+}
 
 type Fault struct {
 	code     faultCode
@@ -56,8 +70,16 @@ func (f Fault) Original() error {
 }
 
 func (f Fault) Error() string {
+	if md, ok := f.metadata.(FieldErrorsMetadata); f.code == BadInputCode && f.message == "" &&  ok {
+		return md.String()
+	}
+
 	if f.original != nil {
 		return fmt.Sprintf("%s: %v", f.message, f.original)
 	}
+
 	return f.message
+}
+func (f Fault) Equals(other Fault) bool {
+	return f.Message() == other.Message() && f.Code() == other.Code() && reflect.DeepEqual(f.Metadata(), other.Metadata())
 }
