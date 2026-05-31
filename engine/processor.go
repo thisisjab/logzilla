@@ -49,6 +49,7 @@ func (pm *processorManager) run(ctx context.Context, rawLogsChan <-chan entity.L
 		for {
 			select {
 			case <-ctx.Done():
+				// TODO: when cancel received process remaining logs
 				return
 			case j, ok := <-rawLogsChan:
 				if !ok {

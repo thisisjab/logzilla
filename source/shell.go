@@ -27,7 +27,7 @@ type ShellLogSource struct {
 	cmdArgs []string
 }
 
-func NewShellLogSource(logger *slog.Logger, cfg ShellLogSourceConfig) (*ShellLogSource, error) {
+func NewShellLogSource(cfg ShellLogSourceConfig, logger *slog.Logger) (*ShellLogSource, error) {
 	if len(cfg.Command) < 1 {
 		return nil, fmt.Errorf("command cannot be empty")
 	}
@@ -98,6 +98,7 @@ func (s *ShellLogSource) Provide(ctx context.Context, logChan chan<- entity.LogR
 
 	if err := cmd.Wait(); err != nil {
 		if errors.Is(ctx.Err(), context.Canceled) {
+			s.logger.Info("context is done, stopping the source", "name", s.Name(), "type", "shell")
 			return nil
 		} else {
 			return fmt.Errorf("command finished with error: %w", err)

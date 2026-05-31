@@ -11,13 +11,13 @@ import (
 )
 
 type Config struct {
-	Sources                    []LogSource
-	Processors                 []LogProcessor
-	Storage                    EngineStorage
-	StorageFlushInterval       time.Duration
-	RawLogsBufferMaxSize       uint
-	ProcessedLogsBufferMaxSize uint
-	ProcessorWorkersCount      uint
+	Sources               []LogSource
+	Processors            []LogProcessor
+	Storage               EngineStorage
+	StorageFlushInterval  time.Duration `yaml:"storage-flush-interval"`
+	InBufferSize          uint `yaml:"in-buffer-size"`
+	OutBufferSize         uint `yaml:"out-buffer-size"`
+	ProcessorWorkersCount uint `yaml:"processor-workers-count"`
 }
 
 // Engine orchestrates different components such as log sources (readers) and processors.
@@ -35,7 +35,7 @@ func New(cfg Config, logger *slog.Logger) (*Engine, error) {
 	return &Engine{
 		cfg:            cfg,
 		logger:         logger,
-		storageManager: newStorageManager(logger, cfg.Storage, cfg.RawLogsBufferMaxSize, cfg.StorageFlushInterval)}, nil
+		storageManager: newStorageManager(logger, cfg.Storage, cfg.OutBufferSize, cfg.StorageFlushInterval)}, nil
 }
 
 func (c Config) validate() error {
@@ -49,12 +49,12 @@ func (c Config) validate() error {
 		return errors.New("no log storage is configured")
 	}
 
-	if c.RawLogsBufferMaxSize == 0 && c.StorageFlushInterval == 0 {
-		return errors.New("raw logs buffer max size and storage flush interval cannot both be zero")
+	if c.InBufferSize == 0 && c.StorageFlushInterval == 0 {
+		return errors.New("in buffer size and storage flush interval cannot both be zero")
 	}
 
-	if c.ProcessedLogsBufferMaxSize == 0 {
-		return errors.New("processed logs buffer max size cannot be zero")
+	if c.OutBufferSize == 0 {
+		return errors.New("out buffer size cannot be zero")
 	}
 
 	if c.ProcessorWorkersCount == 0 {
@@ -70,7 +70,7 @@ func (e *Engine) Run(ctx context.Context) error {
 	rawLogs := e.consumeLogs(ctx)
 
 	var wg sync.WaitGroup
-	processedLogs := make(chan entity.LogRecord, e.cfg.ProcessedLogsBufferMaxSize)
+	processedLogs := make(chan entity.LogRecord, e.cfg.OutBufferSize)
 
 	pm := newProcessorManager(e.logger, e.cfg.Sources, e.cfg.Processors, e.cfg.ProcessorWorkersCount)
 
@@ -84,7 +84,7 @@ func (e *Engine) Run(ctx context.Context) error {
 		case <-ctx.Done():
 			wg.Wait()
 
-			return ctx.Err()
+			return nil
 		case p, ok := <-processedLogs:
 			if !ok {
 				return nil
@@ -95,8 +95,8 @@ func (e *Engine) Run(ctx context.Context) error {
 }
 
 func (e *Engine) consumeLogs(ctx context.Context) <-chan entity.LogRecord {
-	rawLogs := make(chan entity.LogRecord, e.cfg.RawLogsBufferMaxSize)
-	e.logger.Info("created incoming logs channel.", "size", e.cfg.RawLogsBufferMaxSize)
+	rawLogs := make(chan entity.LogRecord, e.cfg.InBufferSize)
+	e.logger.Info("created incoming logs channel.", "size", e.cfg.InBufferSize)
 
 	var sourceWg sync.WaitGroup
 
