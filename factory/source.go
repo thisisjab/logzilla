@@ -33,10 +33,10 @@ func BuildSource(cfg source.Config, logger *slog.Logger) (engine.LogSource, erro
 // BuildSources creates a slice of LogSource instances based on the provided configuration.
 func BuildSources(cfgs []source.Config, logger *slog.Logger) ([]engine.LogSource, error) {
 	sources := make([]engine.LogSource, 0, len(cfgs))
-	for _, cfg := range cfgs {
+	for i, cfg := range cfgs {
 		source, err := BuildSource(cfg, logger)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("error when building source at index %d: %w", i, err)
 		}
 		sources = append(sources, source)
 	}

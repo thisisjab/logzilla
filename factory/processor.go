@@ -33,10 +33,10 @@ func BuildProcessor(cfg processor.Config) (engine.LogProcessor, error) {
 // BuildProcessors creates a slice of LogProcessor instances based on the provided configuration.
 func BuildProcessors(cfgs []processor.Config) ([]engine.LogProcessor, error) {
 	processors := make([]engine.LogProcessor, 0, len(cfgs))
-	for _, cfg := range cfgs {
+	for i, cfg := range cfgs {
 		processor, err := BuildProcessor(cfg)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("error when building processor at index %d: %w", i, err)
 		}
 		processors = append(processors, processor)
 	}
