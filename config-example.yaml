@@ -4,7 +4,7 @@ engine:
   processor-workers-count: 10
   # Max number of logs that can wait to be processed
   in-buffer-size: 10
-  # Max number of buffered logs before being flushed to the storage - setting this to zero will disable buffering
+  # Max number of buffered logs before being flushed to the storage
   out-buffer-size: 10
   # Max wait duration before flushing buffered logs to the storage -setting this to zero will disable periodic flushing
   storage-flush-interval: 10s
