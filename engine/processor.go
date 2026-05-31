@@ -15,8 +15,8 @@ type LogProcessor interface {
 	Process(logRecord entity.LogRecord) (entity.LogRecord, error)
 }
 
-// processorManager provides multiple workers (fan-out pattern) that process incoming logs (raw logs actually).
-type processorManager struct {
+// processorFanout orchestrates multiple workers that should process incoming (raw) logs.
+type processorFanout struct {
 	sources      map[string]LogSource
 	processors   map[string]LogProcessor
 	logger       *slog.Logger
@@ -24,18 +24,21 @@ type processorManager struct {
 	wg           sync.WaitGroup
 }
 
-func newProcessorManager(logger *slog.Logger, sources []LogSource, processors []LogProcessor, workersCount uint) *processorManager {
+// newProcessorFanout creates a new processorFanout.
+func newProcessorFanout(logger *slog.Logger, sources []LogSource, processors []LogProcessor, workersCount uint) *processorFanout {
+	// s and p are maps of source and processor names to their corresponding objects.
 	s := make(map[string]LogSource)
 	p := make(map[string]LogProcessor)
 
 	for _, source := range sources {
 		s[source.Name()] = source
 	}
+
 	for _, processor := range processors {
 		p[processor.Name()] = processor
 	}
 
-	return &processorManager{
+	return &processorFanout{
 		sources:      s,
 		processors:   p,
 		logger:       logger,
@@ -43,24 +46,24 @@ func newProcessorManager(logger *slog.Logger, sources []LogSource, processors []
 	}
 }
 
-// run reads raw logs and processes the log, then pushes the processed log back to results channel to be further processed (stored).
-func (pm *processorManager) run(ctx context.Context, rawLogsChan <-chan entity.LogRecord, results chan<- entity.LogRecord) {
+// run reads unprocessed logs and processes the log, then pushes the processed log back to results channel.
+func (pf *processorFanout) run(ctx context.Context, unprocessedLogs <-chan entity.LogRecord, results chan<- entity.LogRecord) {
 	spawnWorker := func(workerId int) {
 		for {
 			select {
 			case <-ctx.Done():
 				// TODO: when cancel received process remaining logs
 				return
-			case j, ok := <-rawLogsChan:
+			case j, ok := <-unprocessedLogs:
 				if !ok {
 					// The jobs channel is closed and empty. No more work.
 					return
 				}
 				// Process and send to results
-				processed := pm.processLog(j)
+				processed := pf.processLog(j)
 				processed.ID = uuid.New()
 
-				pm.logger.Debug("processed log", "worker_id", workerId, "log_id", processed.ID)
+				pf.logger.Debug("processed log", "worker_id", workerId, "log_id", processed.ID)
 
 				select {
 				case results <- processed:
@@ -72,38 +75,39 @@ func (pm *processorManager) run(ctx context.Context, rawLogsChan <-chan entity.L
 		}
 	}
 
-	for i := 0; i < int(pm.workersCount); i++ {
-		pm.wg.Go(func() {
+	for i := 0; i < int(pf.workersCount); i++ {
+		pf.wg.Go(func() {
 			spawnWorker(i)
 		})
 	}
 
-	pm.wg.Wait()
+	pf.wg.Wait()
 }
 
-// processLog is the actual function that processes a raw log based on it's source and corresponding processors.
-func (pm *processorManager) processLog(rawLog entity.LogRecord) entity.LogRecord {
-	src, ok := pm.sources[rawLog.Source]
+// processLog is the actual function that processes an unprocessed log based on it's source and corresponding processors.
+func (pf *processorFanout) processLog(unprocessedLog entity.LogRecord) entity.LogRecord {
+	src, ok := pf.sources[unprocessedLog.Source]
 	if !ok {
-		pm.logger.Error("source not found", "source", rawLog.Source)
-		return rawLog
+		pf.logger.Error("source not found", "source", unprocessedLog.Source)
+		return unprocessedLog
 	}
 
+	// NOTE: it's kind of unnecessary to check if processors exists for a source as it's done in engine as well, but I'm keeping it for now.
 	for _, pName := range src.ProcessorNames() {
-		p := pm.processors[pName]
+		p := pf.processors[pName]
 		if p == nil {
-			pm.logger.Warn("processor not found", "processor", pName)
+			pf.logger.Warn("processor not found", "processor", pName)
 			continue
 		}
 
-		processedLog, err := p.Process(rawLog)
+		processedLog, err := p.Process(unprocessedLog)
 		if err != nil {
-			pm.logger.Error("failed to process log", "processor", pName, "error", err)
+			pf.logger.Error("failed to process log", "processor", pName, "error", err)
 			continue
 		}
 
-		rawLog = processedLog
+		unprocessedLog = processedLog
 	}
 
-	return rawLog
+	return unprocessedLog
 }

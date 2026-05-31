@@ -8,21 +8,22 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/thisisjab/logzilla/config"
 	"github.com/thisisjab/logzilla/engine"
 	"github.com/thisisjab/logzilla/factory"
-	"github.com/thisisjab/logzilla/server"
 )
 
 func main() {
 	// Create a context that can be cancelled
 	ctx, cancel := context.WithCancel(context.Background())
 
-	// Parse configuration
+	// Parse flags
 	cfgPath := flag.String("config", "./.config.yaml", "path to config file")
 	flag.Parse()
 
+	// Parse configuration
 	cfg, err := config.Parse(*cfgPath)
 	if err != nil {
 		panic(fmt.Errorf("cannot parse config file: %w", err))
@@ -39,10 +40,9 @@ func main() {
 	}()
 
 	// Build storage
-	logger.Info("connecting to storage")
 	engineStorage, err := factory.BuildStorage(cfg.Storage)
 	if err != nil {
-		logger.Error("cannot create storage", "error", err)
+		logger.Error("cannot setup storage", "error", err)
 		os.Exit(1)
 	}
 
@@ -72,15 +72,9 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Start the actual storage connection
 	if err := engineStorage.Open(ctx); err != nil {
 		logger.Error("cannot open connection to the storage", "error", err)
-		os.Exit(1)
-	}
-
-	// Create api server
-	apiServer, err := server.New(cfg.Server, engineStorage, logger)
-	if err != nil {
-		logger.Error("api server error.", "error", err)
 		os.Exit(1)
 	}
 
@@ -92,32 +86,31 @@ func main() {
 		}
 	}()
 
-	// Run api server
-	go func() {
-		if err := apiServer.Serve(ctx); err != nil {
-			logger.Error("api server error.", "error", err)
-			cancel()
-		}
-	}()
-
 	// Setup signal handling to catch Ctrl+C (SIGINT) or Terminate (SIGTERM)
 	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
 
 	// Wait for signal
 	select {
 	case sig := <-sigChan:
+		const secondsToExit = 30
+		logger.Warn("received signal, shutting down", "signal", sig, "wait_seconds", secondsToExit)
+
 		cancel()
-		logger.Info("received signal. shutting down.", "signal", sig)
-		if err := engineStorage.Close(ctx); err != nil {
-			logger.Error("error when closing the storage", "error", err)
-		}
-		logger.Info("storage stopped")
+		time.Sleep(secondsToExit * time.Second)
+
 	case <-ctx.Done():
-		logger.Info("running cancelled")
-		logger.Info("engine stopped")
+
 	}
 
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer shutdownCancel()
+
+	if err := engineStorage.Close(shutdownCtx); err != nil {
+		logger.Error("error when closing the storage", "error", err)
+	}
+
+	logger.Info("bye bye")
 }
 
 func createLogger(cfg config.LoggerConfig) *slog.Logger {
