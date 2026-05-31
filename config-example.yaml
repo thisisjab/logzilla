@@ -3,9 +3,9 @@ engine:
   # Number of logs that can be processed in parallel (or concurrently according to your environment)
   processor-workers-count: 10
   # Max number of logs that can wait to be processed
-  raw-logs-buffer-size: 10
-  # Max number of buffered logs before being flushed to the storage - setting this to zero will disable buffering
-  processed-logs-buffer-size: 10
+  in-buffer-size: 10
+  # Max number of buffered logs before being flushed to the storage
+  out-buffer-size: 10
   # Max wait duration before flushing buffered logs to the storage -setting this to zero will disable periodic flushing
   storage-flush-interval: 10s
 
@@ -68,13 +68,13 @@ sources:
 
 # Logger configuration for Logzilla itself
 logger:
-  # You can use `json`, `text`, and `colored-text` as loggers.
-  type: colored-text
+  # You can use `json` & `text`
+  handler: text
   level: debug
 
-# API server is used UI functionality in most cases.
+# Server is used with UI functionality.
 # In future it will support log congestion from web sources.
-api-server:
+server:
   addr: ":8000"
   cors:
     trusted-origins:

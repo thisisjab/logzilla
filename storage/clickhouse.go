@@ -119,7 +119,7 @@ func (s *ClickHouseStorage) StoreRawLogs(ctx context.Context, logs ...entity.Log
 		return nil
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, 1*time.Minute)
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 1*time.Minute)
 	defer cancel()
 
 	batch, err := s.conn.PrepareBatch(ctx, "INSERT INTO raw_logs (id, source, timestamp, level, raw_data)")
@@ -148,7 +148,7 @@ func (s *ClickHouseStorage) StoreProcessedLogs(ctx context.Context, logs ...enti
 		return nil
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, 1*time.Minute)
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 1*time.Minute)
 	defer cancel()
 
 	batch, err := s.conn.PrepareBatch(ctx, "INSERT INTO processed_logs (id, source, timestamp, level, message, metadata)")

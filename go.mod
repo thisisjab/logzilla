@@ -16,7 +16,6 @@ require (
 	github.com/go-faster/errors v0.7.1 // indirect
 	github.com/google/uuid v1.6.0
 	github.com/klauspost/compress v1.18.3 // indirect
-	github.com/lmittmann/tint v1.1.3
 	github.com/paulmach/orb v0.12.0 // indirect
 	github.com/pierrec/lz4/v4 v4.1.25 // indirect
 	github.com/segmentio/asm v1.2.1 // indirect
@@ -26,5 +25,4 @@ require (
 	go.opentelemetry.io/otel/trace v1.39.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.4
 	golang.org/x/sys v0.40.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1
 )

@@ -26,7 +26,7 @@ type FileLogSource struct {
 }
 
 // NewFileLogSource creates a new FileLogSource instance.
-func NewFileLogSource(logger *slog.Logger, cfg FileLogSourceConfig) (*FileLogSource, error) {
+func NewFileLogSource(cfg FileLogSourceConfig, logger *slog.Logger) (*FileLogSource, error) {
 	if cfg.Name == "" {
 		return nil, fmt.Errorf("name cannot be empty")
 	}
@@ -56,8 +56,10 @@ func (f *FileLogSource) Provide(ctx context.Context, logChan chan<- entity.LogRe
 	}
 	defer func() {
 		err := file.Close()
-		if err != nil {f.logger.Warn("error when closing the file", "error", err)}
-	} ()
+		if err != nil {
+			f.logger.Warn("error when closing the file", "error", err)
+		}
+	}()
 
 	// Always seek to the end of the file
 	// Note that when file is read (when notified by fsnotify), the cursor will move to end of file
@@ -72,7 +74,9 @@ func (f *FileLogSource) Provide(ctx context.Context, logChan chan<- entity.LogRe
 	}
 	defer func() {
 		err := watcher.Close()
-		if err != nil {f.logger.Warn("error when closing the watcher", "error", err)}
+		if err != nil {
+			f.logger.Warn("error when closing the watcher", "error", err)
+		}
 	}()
 
 	if err := watcher.Add(f.cfg.FilePath); err != nil {
@@ -84,6 +88,7 @@ func (f *FileLogSource) Provide(ctx context.Context, logChan chan<- entity.LogRe
 	for {
 		select {
 		case <-ctx.Done():
+			f.logger.Info("context is done, stopping the source", "name", f.cfg.Name, "type", "file")
 			return nil
 
 		case event, ok := <-watcher.Events:

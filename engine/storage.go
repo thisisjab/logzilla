@@ -10,7 +10,7 @@ import (
 )
 
 // EngineStorage represents a storage interface for the engine.
-// EngineStorage needs to handle buffering by itself.
+// EngineStorage must be able to store logs.
 type EngineStorage interface {
 	StoreProcessedLogs(ctx context.Context, logs ...entity.LogRecord) error
 }
