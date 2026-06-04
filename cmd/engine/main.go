@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/thisisjab/logzilla/config"
 	"github.com/thisisjab/logzilla/engine"
@@ -93,7 +94,9 @@ func main() {
 	}
 
 	// Safe to close storage now — engine is fully done
-	if err := engineStorage.Close(ctx); err != nil {
+	storageCloseCtx, storageCloseCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer storageCloseCancel()
+	if err := engineStorage.Close(storageCloseCtx); err != nil {
 		logger.Error("cannot close storage", "error", err)
 	}
 
