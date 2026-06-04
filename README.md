@@ -176,8 +176,8 @@ For production deployments, adjust these parameters based on your workload:
 processor-workers-count: 50
 
 # Larger buffers for bursty traffic
-raw-logs-buffer-size: 10000
-processed-logs-buffer-size: 5000
+in-buffer-size: 10000
+out-buffer-size: 5000
 
 # More frequent flushes for real-time requirements
 storage-flush-interval: 1s
