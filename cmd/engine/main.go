@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/thisisjab/logzilla/config"
 	"github.com/thisisjab/logzilla/engine"
@@ -72,45 +71,33 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Start the actual storage connection
+	// Start storage
 	if err := engineStorage.Open(ctx); err != nil {
-		logger.Error("cannot open connection to the storage", "error", err)
+		logger.Error("cannot open storage", "error", err)
 		os.Exit(1)
 	}
 
-	// Run engine
+	// Graceful Shutdown: Setup signal handling to catch Ctrl+C (SIGINT) or Terminate (SIGTERM)
 	go func() {
-		if err := eng.Run(ctx); err != nil {
-			logger.Error("engine error.", "error", err)
-			cancel()
-		}
+		sigChan := make(chan os.Signal, 1)
+		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
+
+		sig := <-sigChan
+		logger.Warn("received signal, shutting down", "signal", sig)
+		cancel()
 	}()
 
-	// Setup signal handling to catch Ctrl+C (SIGINT) or Terminate (SIGTERM)
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
-
-	// Wait for signal
-	select {
-	case sig := <-sigChan:
-		const secondsToExit = 30
-		logger.Warn("received signal, shutting down", "signal", sig, "wait_seconds", secondsToExit)
-
-		cancel()
-		time.Sleep(secondsToExit * time.Second)
-
-	case <-ctx.Done():
-
+	logger.Info("starting logzilla engine")
+	if err := eng.Run(ctx); err != nil {
+		logger.Error("engine error", "error", err)
 	}
 
-	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer shutdownCancel()
-
-	if err := engineStorage.Close(shutdownCtx); err != nil {
-		logger.Error("error when closing the storage", "error", err)
+	// Safe to close storage now — engine is fully done
+	if err := engineStorage.Close(ctx); err != nil {
+		logger.Error("cannot close storage", "error", err)
 	}
 
-	logger.Info("bye bye")
+	logger.Info("logzilla engine stopped")
 }
 
 func createLogger(cfg config.LoggerConfig) *slog.Logger {

@@ -56,6 +56,7 @@ func (sm *engineStorageManager) run(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
+			sm.logger.Info("flushing remaining logs")
 			sm.flushBuffers(ctx)
 			sm.wg.Wait()
 			return

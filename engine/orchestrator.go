@@ -114,31 +114,47 @@ func (c Config) validate() error {
 
 // Run starts the engine. It's a blocking call that runs the engine until the context is cancelled OR the engine is stopped.
 func (eng *Engine) Run(ctx context.Context) error {
-	var wg sync.WaitGroup
-
 	// Start consuming logs from all sources.
 	// unprocessedLogsChan channel will contain all logs that are recently received from any source.
-	unprocessedLogsChan := eng.consumeLogs(ctx)
+	unprocessedLogsChan := eng.startConsumingLogs(ctx)
 
 	processedLogsChan := make(chan entity.LogRecord, eng.cfg.OutBufferSize)
-
 	pf := newProcessorFanout(eng.logger, eng.cfg.Sources, eng.cfg.Processors, eng.cfg.ProcessorWorkersCount)
 
+	// NOTE
+	// We use different contexts and wait groups for storage manager and processor fanout.
+	// The reason is we want to process remaining logs first, then flush all logs to storage, and finally exit.
+
 	// Storage manager handles buffering, and periodic saves.
-	wg.Go(func() { eng.storageManager.run(ctx) })
+	storageWg := sync.WaitGroup{}
+	storageCtx, storageCancel := context.WithCancel(context.Background())
+	storageWg.Go(func() { eng.storageManager.run(storageCtx) })
 
 	// Process fanout handles fan-out pattern.
-	wg.Go(func() { pf.run(ctx, unprocessedLogsChan, processedLogsChan) })
+	pfWg := sync.WaitGroup{}
+	pfCtx, pfCancel := context.WithCancel(context.Background())
+	pfWg.Go(func() { pf.run(pfCtx, unprocessedLogsChan, processedLogsChan) })
+
+	shutdown := func() {
+		// First wait for remaining processors to finish.
+		eng.logger.Info("waiting for processors to finish")
+		pfCancel()
+		pfWg.Wait()
+
+		// The flush remaining logs in out buffer (storage manager)
+		eng.logger.Info("waiting for storage to finish")
+		storageCancel()
+		storageWg.Wait()
+	}
 
 	for {
 		select {
 		case <-ctx.Done():
-			// All goroutines (storage manager & processor fanout) will eventually return when context is cancelled.
-			wg.Wait()
-
+			shutdown()
 			return nil
 		case p, ok := <-processedLogsChan:
 			if !ok {
+				shutdown()
 				return nil
 			}
 
@@ -147,9 +163,9 @@ func (eng *Engine) Run(ctx context.Context) error {
 	}
 }
 
-// consumeLogs gathers logs from defined sources, then sends to processorFanout to be processed.
+// startConsumingLogs gathers logs from defined sources, then sends to processorFanout to be processed.
 // Later, processed logs will be sent to storage manager.
-func (eng *Engine) consumeLogs(ctx context.Context) <-chan entity.LogRecord {
+func (eng *Engine) startConsumingLogs(ctx context.Context) <-chan entity.LogRecord {
 	unprocessedLogs := make(chan entity.LogRecord, eng.cfg.InBufferSize)
 
 	var sourceWg sync.WaitGroup

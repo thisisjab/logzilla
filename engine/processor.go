@@ -49,28 +49,14 @@ func newProcessorFanout(logger *slog.Logger, sources []LogSource, processors []L
 // run reads unprocessed logs and processes the log, then pushes the processed log back to results channel.
 func (pf *processorFanout) run(ctx context.Context, unprocessedLogs <-chan entity.LogRecord, results chan<- entity.LogRecord) {
 	spawnWorker := func(workerId int) {
-		for {
+		for j := range unprocessedLogs {
+			processed := pf.processLog(j)
+			processed.ID = uuid.New()
 			select {
+			case results <- processed:
+				pf.logger.Debug("processed log", "worker_id", workerId, "id", processed.ID)
 			case <-ctx.Done():
-				// TODO: when cancel received process remaining logs
 				return
-			case j, ok := <-unprocessedLogs:
-				if !ok {
-					// The jobs channel is closed and empty. No more work.
-					return
-				}
-				// Process and send to results
-				processed := pf.processLog(j)
-				processed.ID = uuid.New()
-
-				pf.logger.Debug("processed log", "worker_id", workerId, "log_id", processed.ID)
-
-				select {
-				case results <- processed:
-				case <-ctx.Done():
-					// If we can't send because context is cancelled, exit.
-					return
-				}
 			}
 		}
 	}
@@ -82,6 +68,7 @@ func (pf *processorFanout) run(ctx context.Context, unprocessedLogs <-chan entit
 	}
 
 	pf.wg.Wait()
+	close(results)
 }
 
 // processLog is the actual function that processes an unprocessed log based on it's source and corresponding processors.
