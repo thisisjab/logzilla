@@ -22,7 +22,7 @@ type Config struct {
 	// Storage defines where logs are stored.
 	// Each storage supports different features. However, I put my best effort to make all storages offer the same features.
 	Storage EngineStorage
-	// StorrageFlushInterval defines how often storage manager should flush logs to storage.
+	// StorageFlushInterval defines how often storage manager should flush logs to storage.
 	// If value is zero, storage manager will not flush logs automatically.
 	StorageFlushInterval time.Duration `yaml:"storage-flush-interval"`
 	// InBufferSize defines how many logs can be buffered before being consumed by processors.
@@ -176,7 +176,7 @@ func (eng *Engine) startConsumingLogs(ctx context.Context) <-chan entity.LogReco
 		go func(name string, src LogSource) {
 			defer sourceWg.Done()
 
-			// Provice is a blocking call, therefore when it returns, it's either by an error or context cancellation.
+			// Provide is a blocking call, therefore when it returns, it's either by an error or context cancellation.
 			err := src.Provide(ctx, unprocessedLogs)
 
 			if err != nil {
