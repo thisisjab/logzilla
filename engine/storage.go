@@ -16,7 +16,6 @@ type EngineStorage interface {
 }
 
 // engineStorageManager manages storage operations like inserting, buffering, and flushing logs.
-// Note that you should never disable buffering and scheduled flushing together.
 type engineStorageManager struct {
 	storage         EngineStorage
 	logger          *slog.Logger
@@ -34,6 +33,7 @@ type engineStorageManager struct {
 	flushInterval time.Duration
 }
 
+// newStorageManager creates a new engineStorageManager.
 func newStorageManager(logger *slog.Logger, storage EngineStorage, bufferMaxSize uint, flushInterval time.Duration) *engineStorageManager {
 	return &engineStorageManager{
 		logger:          logger,
@@ -44,6 +44,7 @@ func newStorageManager(logger *slog.Logger, storage EngineStorage, bufferMaxSize
 	}
 }
 
+// run starts the engineStorageManager
 func (sm *engineStorageManager) run(ctx context.Context) {
 	var ticker *time.Ticker
 
@@ -55,6 +56,7 @@ func (sm *engineStorageManager) run(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
+			sm.logger.Info("flushing remaining logs")
 			sm.flushBuffers(ctx)
 			sm.wg.Wait()
 			return
@@ -72,6 +74,8 @@ func (sm *engineStorageManager) run(ctx context.Context) {
 	}
 }
 
+// flushBuffers stores any processed logs in the storage and clears the outgoing buffer.
+// This function is called occasionally by the engineStorageManager.
 func (sm *engineStorageManager) flushBuffers(ctx context.Context) {
 	var processedToFlush []entity.LogRecord
 
@@ -88,6 +92,7 @@ func (sm *engineStorageManager) flushBuffers(ctx context.Context) {
 	}
 }
 
+// flushProcessedLogs (actually) flushes processed logs to storage.
 func (sm *engineStorageManager) flushProcessedLogs(ctx context.Context, toFlush []entity.LogRecord) {
 	sm.wg.Go(func() {
 		if err := sm.storage.StoreProcessedLogs(ctx, toFlush...); err != nil {
@@ -99,6 +104,7 @@ func (sm *engineStorageManager) flushProcessedLogs(ctx context.Context, toFlush 
 	})
 }
 
+// addProcessedLogs adds processed logs to the outgoing buffer.
 func (sm *engineStorageManager) addProcessedLogs(ctx context.Context, logs ...entity.LogRecord) {
 	if len(logs) == 0 {
 		return
