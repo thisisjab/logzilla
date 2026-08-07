@@ -48,7 +48,12 @@ func (p *Parser) parseIdentifier() (ast.Term, error) {
 
 	p.nextToken()
 
-	n.Values = p.parseValues()
+	vals, err := p.parseValues()
+	if err != nil {
+		return nil, fmt.Errorf("error parsing values for field %s: %w", n.FieldName, err)
+	}
+
+	n.Values = vals
 
 	return n, nil
 }

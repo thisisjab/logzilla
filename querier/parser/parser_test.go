@@ -1,13 +1,11 @@
 package parser
 
 import (
-	"errors"
 	"fmt"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/thisisjab/logzilla/pkg/fault"
 	"github.com/thisisjab/logzilla/querier/ast"
 	"github.com/thisisjab/logzilla/querier/lexer"
 	"github.com/thisisjab/logzilla/querier/token"
@@ -194,20 +192,20 @@ func TestParseControlSectionSort(t *testing.T) {
 // TestParsingControlSection tests parsing of various fields in control section work as expected.
 func TestParsingControlSection(t *testing.T) {
 	tests := map[string]ast.Query{
-		"sort=-foo limit=10 cursor=xxx timestamp=2012-01-01,2026-08-23": ast.Query{
+		"sort=-foo limit=10 cursor=xxx timestamp=2012-01-01,2026-08-23": {
 			Sort:   []ast.SortField{{Name: "foo", IsDescending: true}},
 			Limit:  10,
 			Cursor: "xxx",
 			Start:  time.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 			End:    time.Date(2026, 8, 23, 0, 0, 0, 0, time.UTC),
 		},
-		"limit=1000 cursor=1xyz timestamp=2012-01-01 sort=-bar,foo": ast.Query{
+		"limit=1000 cursor=1xyz timestamp=2012-01-01 sort=-bar,foo": {
 			Sort:   []ast.SortField{{Name: "bar", IsDescending: true}, {Name: "foo", IsDescending: false}},
 			Limit:  1000,
 			Cursor: "1xyz",
 			Start:  time.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 		},
-		"limit=1000 cursor=1xyz timestamp=2012-01-01 sort=-bar,foo limit=10 cursor=\"abc\" sort=foobar timestamp=2020-10-12,3030-03-03": ast.Query{
+		"limit=1000 cursor=1xyz timestamp=2012-01-01 sort=-bar,foo limit=10 cursor=\"abc\" sort=foobar timestamp=2020-10-12,3030-03-03": {
 			Sort:   []ast.SortField{{Name: "bar", IsDescending: true}, {Name: "foo", IsDescending: false}, {Name: "foobar", IsDescending: false}},
 			Limit:  10,
 			Cursor: "abc",
@@ -359,19 +357,19 @@ func TestParseIdentifier(t *testing.T) {
 func TestFailingParseQuery(t *testing.T) {
 	tests := []struct {
 		q           string
-		expectedErr fault.Fault
+		expectedErrMsg string
 	}{
 		{
 			q:           ": level=1 level=2", // there is not & or | between two clauses
-			expectedErr: fault.New(fault.BadInputCode, "").WithMetadata(fault.FieldErrorsMetadata{"query": []string{"unexpected token or clause: IDENT"}}),
+			expectedErrMsg: "unexpected token or clause: IDENT",
 		},
 		{
 			q:           "timestamp = :",
-			expectedErr: fault.New(fault.BadInputCode, "").WithMetadata(fault.FieldErrorsMetadata{"query": []string{"error when parsing `timestamp`: expected token of type `STRING`, but got COLON (literal=`:`)"}}),
+			expectedErrMsg: "error when parsing `timestamp`: expected token of type `STRING`, but got COLON (literal=`:`)",
 		},
 		{
 			q:           ": message ~ not \" terminated",
-			expectedErr: fault.New(fault.BadInputCode, "").WithMetadata(fault.FieldErrorsMetadata{"query": []string{"unexpected token or clause: STRING"}}),
+			expectedErrMsg: "unexpected token or clause: STRING",
 		},
 	}
 
@@ -384,18 +382,10 @@ func TestFailingParseQuery(t *testing.T) {
 		_, err := p.ParseQuery()
 		if err == nil {
 			t.Errorf("[%d] parse query didn't fail: %s", i, tc.q)
-		} else {
-			var f fault.Fault
-			if errors.As(err, &f) {
-
-				if !f.Equals(tc.expectedErr) {
-					t.Errorf("[%d] didn't get expected error:\nexpected: %+v\ngot: %+v", i, tc.expectedErr.Metadata(), f.Metadata())
-				}
-
-			} else {
-				t.Errorf("[%d] expected Fault, but got type %T", i, err)
-			}
 		}
 
+		if err.Error() != tc.expectedErrMsg  {
+			t.Errorf("[%d] expected error `%s`, but got: %s", i, tc.expectedErrMsg, err)
+		}
 	}
 }

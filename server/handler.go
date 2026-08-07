@@ -23,7 +23,12 @@ func (s *server) searchLogsHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Process user given string using lexer and parser
 	p, err := parser.New(lexer.New(reqBody.Query)).ParseQuery()
-	if s.returnOnError(w, r, err) {
+	if err != nil {
+		s.writeError(w, r, http.StatusUnprocessableEntity, apiResponse{
+			Success: false,
+			Message: err.Error(),
+		})
+
 		return
 	}
 

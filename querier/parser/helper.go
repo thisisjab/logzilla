@@ -69,7 +69,7 @@ func (p *Parser) parseSingleSortField() (ast.SortField, error) {
 	return s, nil
 }
 
-func (p *Parser) parseValues() []any {
+func (p *Parser) parseValues() ([]any, error) {
 	values := make([]any, 0)
 
 	for p.currentTokenTypeIs(token.STRING, token.IDENT, token.INT, token.DECIMAL, token.NULL, token.TRUE, token.FALSE) {
@@ -80,7 +80,7 @@ func (p *Parser) parseValues() []any {
 		case token.INT:
 			num, err := strconv.Atoi(p.curToken.Literal)
 			if err != nil {
-				panic(fmt.Errorf("cannot parse %s to a valid int", p.curToken.Literal))
+				return nil, fmt.Errorf("cannot parse %s to a valid int", p.curToken.Literal)
 			}
 
 			values = append(values, num)
@@ -88,7 +88,7 @@ func (p *Parser) parseValues() []any {
 		case token.DECIMAL:
 			num, err := strconv.ParseFloat(p.curToken.Literal, 64)
 			if err != nil {
-				panic(fmt.Errorf("cannot parse %s to a valid decimal", p.curToken.Literal))
+				return nil, fmt.Errorf("cannot parse %s to a valid decimal", p.curToken.Literal)
 			}
 
 			values = append(values, num)
@@ -100,16 +100,16 @@ func (p *Parser) parseValues() []any {
 			values = append(values, nil)
 
 		default:
-			p.addPeekError(token.STRING, token.IDENT, token.INT, token.DECIMAL, token.NULL, token.TRUE, token.FALSE)
+			return nil, p.createPeekError(token.STRING, token.IDENT, token.INT, token.DECIMAL, token.NULL, token.TRUE, token.FALSE)
 		}
 
 		if p.peekToken.Type != token.COMMA {
-			return values
+			return values, nil
 		}
 
-		p.nextToken() // Read comma
-		p.nextToken() // Read next value
+		p.nextToken()
+		p.nextToken()
 	}
 
-	return values
+	return values, nil
 }

@@ -70,7 +70,11 @@ func TestParseValues(t *testing.T) {
 	for i, tc := range tests {
 		l = lexer.New(tc.input)
 		p = New(l)
-		result := p.parseValues()
+		result, err := p.parseValues()
+
+		if err != nil {
+			t.Fatalf("[%d] expected no error but got: %s", i, err)
+		}
 
 		if len(result) != len(tc.expected) {
 			t.Fatalf("[%d] expected result and expected have different lengths: %d != %d\nresult:%+vexpected:%+v", i, len(result), len(tc.expected), result, tc.expected)

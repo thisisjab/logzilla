@@ -60,11 +60,11 @@ func (s *server) handleError(w http.ResponseWriter, r *http.Request, err error) 
 	s.internalServerError(w, r, err)
 }
 
-func (s *server) logError(w http.ResponseWriter, r *http.Request, err error) {
+func (s *server) logError(_ http.ResponseWriter, r *http.Request, err error) {
 	s.logger.Error("internal server error", "method", r.Method, "path", r.RequestURI, "remote-addr", r.RemoteAddr, "error", err)
 }
 
-func (s *server) writeError(w http.ResponseWriter, r *http.Request, status int, response apiResponse) {
+func (s *server) writeError(w http.ResponseWriter, _ *http.Request, status int, response apiResponse) {
 	s.writeJson(w, status, response, nil) //nolint:errcheck
 }
 

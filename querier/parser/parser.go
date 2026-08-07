@@ -5,7 +5,6 @@ import (
 	"slices"
 	"strconv"
 
-	"github.com/thisisjab/logzilla/pkg/fault"
 	"github.com/thisisjab/logzilla/pkg/helper"
 	"github.com/thisisjab/logzilla/querier/ast"
 	"github.com/thisisjab/logzilla/querier/lexer"
@@ -67,7 +66,7 @@ func (p *Parser) ParseQuery() (*ast.Query, error) {
 
 	for p.curToken.Type != token.EOF {
 		if p.curToken.Type == token.ILLEGAL {
-			return nil, fault.New(fault.BadInputCode, "Illegal token.").WithMetadata(fault.FieldErrorsMetadata{"query": []string{fmt.Sprintf("illegal token: %s", p.curToken.Literal)}})
+			return nil, fmt.Errorf("illegal token: %s", p.curToken.Literal)
 		}
 
 		if p.curToken.Type == token.COLON {
@@ -78,12 +77,12 @@ func (p *Parser) ParseQuery() (*ast.Query, error) {
 		if isParsingFilterSection {
 			err := p.parseFilterStatement(q)
 			if err != nil {
-				return nil, fault.New(fault.BadInputCode, "").WithMetadata(fault.FieldErrorsMetadata{"query": []string{err.Error()}})
+				return nil, err
 			}
 		} else {
 			err := p.parseControlStatement(q)
 			if err != nil {
-				return nil, fault.New(fault.BadInputCode, "").WithMetadata(fault.FieldErrorsMetadata{"query": []string{err.Error()}})
+				return nil, err
 			}
 		}
 
