@@ -45,7 +45,7 @@ services:
       - ch_data:/var/lib/clickhouse
       - ch_logs:/var/log/clickhouse-server
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "localhost:8123/ping"]
+      test: ["CMD", "wget", "--spider", "-q", "127.0.0.1:8123/ping"]
       interval: 10s
       timeout: 5s
       retries: 5
