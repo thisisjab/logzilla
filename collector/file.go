@@ -3,9 +3,11 @@ package collector
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/fsnotify/fsnotify"
 )
@@ -26,42 +28,47 @@ func NewFileCollector(path string) (*FileCollector, error) {
 	return &FileCollector{path: path}, nil
 }
 
-// Collect blocks until ctx is cancelled, sending new log lines to dest.
-// Opens the file, seeks to end, then watches for write events.
-// On write, scans and sends new lines. Returns context cancellation error.
+// Collect tails the configured file until ctx is cancelled.
+//
+// Behaviour:
+//   - Opens the file and starts reading from its current end (like `tail -f`).
+//   - Watches the file for write events using fsnotify.
+//   - Sends each newly appended line to dest.
+//   - Exits cleanly on context cancellation or watcher failure.
 func (c *FileCollector) Collect(ctx context.Context, dest chan<- string) error {
+	// Open the log file.
 	file, err := os.Open(c.path)
 	if err != nil {
 		return fmt.Errorf("cannot open file: %w", err)
 	}
 	defer file.Close()
 
-	_, err = file.Seek(0, io.SeekEnd)
-	if err != nil {
+	// Ignore existing content and only read newly appended logs.
+	if _, err := file.Seek(0, io.SeekEnd); err != nil {
 		return fmt.Errorf("cannot seek to end: %w", err)
 	}
 
+	// Create a filesystem watcher.
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		return fmt.Errorf("cannot create watcher: %w", err)
 	}
 	defer watcher.Close()
 
+	// Watch the target file.
 	if err := watcher.Add(c.path); err != nil {
 		return fmt.Errorf("cannot watch file: %w", err)
 	}
 
-	// NOTE: We can use larger buffer.
-	scanner := bufio.NewScanner(file)
+	// Reader keeps its position on the same file descriptor,
+	// allowing continuous reads as the file grows.
+	reader := bufio.NewReader(file)
 
-	// Buffered so the goroutine's send below never blocks on us reading it.
+	// Receives exactly one terminal error from the worker goroutine.
+	// The channel is closed on every exit path.
 	watcherErr := make(chan error, 1)
 
 	go func() {
-		// Guarantees watcherErr is ALWAYS closed when this goroutine exits,
-		// on every return path below (including the ctx.Done() one). This
-		// is what makes the blocking <-watcherErr below safe: it can never
-		// hang forever, because this defer always fires eventually.
 		defer close(watcherErr)
 
 		for {
@@ -70,51 +77,53 @@ func (c *FileCollector) Collect(ctx context.Context, dest chan<- string) error {
 				if !ok {
 					return
 				}
+
 				if !event.Has(fsnotify.Write) {
 					continue
 				}
 
-				for scanner.Scan() {
+				// Read every complete line that was appended by this write.
+				for {
+					line, err := reader.ReadString('\n')
+
+					// EOF means we've consumed all currently available data.
+					// Wait for the next write event.
+					if errors.Is(err, io.EOF) {
+						break
+					}
+
+					if err != nil {
+						watcherErr <- fmt.Errorf("reader error: %w", err)
+						return
+					}
+
+					// Forward the log line unless cancellation wins.
 					select {
-					case dest <- scanner.Text():
+					case dest <- strings.TrimSuffix(line, "\n"):
 					case <-ctx.Done():
-						// Cancelled mid-send: stop immediately, don't
-						// block trying to push more lines to dest.
 						return
 					}
 				}
 
-				if err := scanner.Err(); err != nil {
-					watcherErr <- fmt.Errorf("scanner error: %w", err)
-					return
-				}
-
+			// fsnotify encountered an internal error.
 			case err, ok := <-watcher.Errors:
 				if !ok {
 					return
 				}
-				watcherErr <- err
+				watcherErr <- fmt.Errorf("watcher error: %w", err)
 				return
 
 			case <-ctx.Done():
-				// Cancelled while idle, waiting for the next event.
 				return
 			}
 		}
 	}()
 
-	// Block until the goroutine actually stops and closes watcherErr.
-	// This is NOT racing ctx.Done() separately — we deliberately wait
-	// for the goroutine's own exit signal instead of returning the
-	// instant ctx is cancelled, so we never return to the caller while
-	// the goroutine might still be running (e.g. mid dest<- send).
-	// Because the goroutine selects on ctx.Done() at every blocking
-	// point, it notices cancellation immediately, so this is not slow —
-	// it's just correct.
-	err = <-watcherErr
-	if err != nil {
-		return fmt.Errorf("watcher error: %w", err)
+	// Wait until the worker exits. If it reported an error, return it.
+	if err := <-watcherErr; err != nil {
+		return err
 	}
 
+	// Normal termination is always caused by context cancellation.
 	return context.Cause(ctx)
 }
