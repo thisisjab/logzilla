@@ -95,8 +95,10 @@ func (agg *Aggregator) Ingest(ctx context.Context) error {
 		case <-ctx.Done():
 			// Stop all collectors
 			for name, c := range agg.collectors {
-				agg.logger.Info("stopping collector", "name", name)
-				c.cancel()
+				if c.cancel != nil {
+					agg.logger.Info("stopping collector", "name", name)
+					c.cancel()
+				}
 			}
 
 			agg.collectorWg.Wait()
