@@ -31,7 +31,7 @@ type Aggregator struct {
 
 type Config struct {
 	CollectorsPath string
-	Logger     *slog.Logger
+	Logger         *slog.Logger
 }
 
 func New(cfg Config) (*Aggregator, error) {
@@ -48,7 +48,7 @@ func New(cfg Config) (*Aggregator, error) {
 	}
 
 	agg := &Aggregator{
-		logger:     cfg.Logger,
+		logger:         cfg.Logger,
 		collectorsPath: cfg.CollectorsPath,
 
 		collectors: make(map[string]*collectorState),
@@ -69,7 +69,7 @@ func (agg *Aggregator) Ingest(ctx context.Context) error {
 
 	// Load initial config
 	if err := agg.loadConfig(ctx); err != nil {
-		return fmt.Errorf("failed to load inital config: %w", err)
+		return fmt.Errorf("failed to load initial config: %w", err)
 	}
 
 	// Watch for any change
