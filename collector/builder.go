@@ -5,17 +5,17 @@ import (
 )
 
 // Build gets a type and map of settings and returns a collector
-func Build(t string, args map[string]any) (Collector, error) {
+func Build(cName, t string, args map[string]any) (Collector, error) {
 	switch t {
 
-	case "file" :
+	case "file":
 		path, exists := args["path"]
 
 		if !exists {
 			return nil, fmt.Errorf("cannot setup collector of type %s: path not set", t)
 		}
 
-		c, err := NewFileCollector(fmt.Sprintf("%s", path))
+		c, err := NewFileCollector(cName, fmt.Sprintf("%s", path))
 		if err != nil {
 			return nil, fmt.Errorf("cannot setup collector of type %s: %w", t, err)
 		}

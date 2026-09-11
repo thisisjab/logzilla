@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/spf13/viper"
@@ -15,6 +16,7 @@ import (
 // Aggregator collects logs from collectors, stores in WALs,
 // and eventually sends WALs to the cluster node to be stored.
 type Aggregator struct {
+	v      *viper.Viper
 	logger *slog.Logger
 	// collectorsPath defines the yaml file that collectors and cluster nodes are read from.
 	// In case of any change to the file, it will trigger a hot reload.
@@ -25,13 +27,16 @@ type Aggregator struct {
 	collectorWg sync.WaitGroup
 	// collectors holds list of collectors with their state.
 	collectors map[string]*collectorState
-	// logsChan holds any log that has been collectted from any collector.
-	logsChan chan string
+	// wal handles persisting logs to disk.
+	wal *wal
+	// cb is the callback function for getting ingested logs from collectors.
+	cb func(collectorName, data string) error
 }
 
 type Config struct {
 	CollectorsPath string
 	Logger         *slog.Logger
+	Viper          *viper.Viper
 }
 
 func New(cfg Config) (*Aggregator, error) {
@@ -47,23 +52,56 @@ func New(cfg Config) (*Aggregator, error) {
 		return nil, errors.New("collectors path must end in .yaml or .yml")
 	}
 
+	v := cfg.Viper
+	if v == nil {
+		v = viper.New()
+	}
+
+	v.SetConfigFile(cfg.CollectorsPath)
+	v.SetDefault("wal.dir", "./data/wal")
+	v.SetDefault("wal.max_bytes", uint(10*1024*1024))
+	v.SetDefault("wal.sync_interval", 5*time.Second)
+
+	// Attempt reading static config (if config file exists already)
+	_ = v.ReadInConfig()
+
+	walDir := v.GetString("wal.dir")
+	walMaxBytes := v.GetUint("wal.max_bytes")
+	walSyncInterval := v.GetDuration("wal.sync_interval")
+
+	w, err := newWAL(walDir, walMaxBytes, walSyncInterval, cfg.Logger)
+	if err != nil {
+		return nil, fmt.Errorf("cannot create WAL: %w", err)
+	}
+
 	agg := &Aggregator{
+		v:              v,
 		logger:         cfg.Logger,
 		collectorsPath: cfg.CollectorsPath,
 
 		collectors: make(map[string]*collectorState),
-
-		// TODO: find optimal value for channel size
-		logsChan: make(chan string, 100),
+		wal:        w,
 	}
+
+	cb := func(collectorName, data string) error {
+		err := agg.wal.append(collectorName, data)
+
+		if err != nil {
+			return fmt.Errorf("cannot append to WAL: %w", err)
+		}
+
+		return nil
+	}
+
+	agg.cb = cb
 
 	return agg, nil
 }
 
 func (agg *Aggregator) Ingest(ctx context.Context) error {
-	viper.SetConfigFile(agg.collectorsPath)
+	agg.v.SetConfigFile(agg.collectorsPath)
 
-	if err := viper.ReadInConfig(); err != nil {
+	if err := agg.v.ReadInConfig(); err != nil {
 		return fmt.Errorf("cannot read config: %w", err)
 	}
 
@@ -73,9 +111,8 @@ func (agg *Aggregator) Ingest(ctx context.Context) error {
 	}
 
 	// Watch for any change
-	viper.WatchConfig()
-	viper.OnConfigChange(func(in fsnotify.Event) {
-		if err := viper.ReadInConfig(); err != nil {
+	agg.v.OnConfigChange(func(in fsnotify.Event) {
+		if err := agg.v.ReadInConfig(); err != nil {
 			agg.logger.Error("cannot read config", "error", err)
 			return
 		}
@@ -86,24 +123,25 @@ func (agg *Aggregator) Ingest(ctx context.Context) error {
 			return
 		}
 	})
+	agg.v.WatchConfig()
 
-	for {
-		select {
-		case l := <-agg.logsChan:
-			// TODO: change with actual logic
-			fmt.Printf("new log: %s\n", l)
-		case <-ctx.Done():
-			// Stop all collectors
-			for name, c := range agg.collectors {
-				if c.cancel != nil {
-					agg.logger.Info("stopping collector", "name", name)
-					c.cancel()
-				}
-			}
+	<-ctx.Done()
 
-			agg.collectorWg.Wait()
-
-			return nil
+	// Stop all collectors
+	agg.mu.Lock()
+	for name, c := range agg.collectors {
+		if c.cancel != nil {
+			agg.logger.Info("stopping collector", "name", name)
+			c.cancel()
 		}
 	}
+	agg.mu.Unlock()
+
+	agg.collectorWg.Wait()
+
+	if agg.wal != nil {
+		agg.wal.close()
+	}
+
+	return nil
 }

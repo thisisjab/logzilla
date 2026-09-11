@@ -15,17 +15,18 @@ import (
 // FileCollector implements Collector interface. It's used to read
 // logs from a file by tailing it.
 type FileCollector struct {
+	name string
 	path string
 }
 
 // NewFileCollector creates a new file collector.
 // Validates that the file exists before returning.
-func NewFileCollector(path string) (*FileCollector, error) {
+func NewFileCollector(name, path string) (*FileCollector, error) {
 	if _, err := os.Stat(path); err != nil {
 		return nil, fmt.Errorf("file does not exist: %w", err)
 	}
 
-	return &FileCollector{path: path}, nil
+	return &FileCollector{name: name, path: path}, nil
 }
 
 // Collect tails the configured file until ctx is cancelled.
@@ -33,9 +34,9 @@ func NewFileCollector(path string) (*FileCollector, error) {
 // Behaviour:
 //   - Opens the file and starts reading from its current end (like `tail -f`).
 //   - Watches the file for write events using fsnotify.
-//   - Sends each newly appended line to dest.
+//   - Calls callback func on every new ingested log.
 //   - Exits cleanly on context cancellation or watcher failure.
-func (c *FileCollector) Collect(ctx context.Context, dest chan<- string) error {
+func (c *FileCollector) Collect(ctx context.Context, cb CollectorCallback) error {
 	// Open the log file.
 	file, err := os.Open(c.path)
 	if err != nil {
@@ -97,10 +98,9 @@ func (c *FileCollector) Collect(ctx context.Context, dest chan<- string) error {
 						return
 					}
 
-					// Forward the log line unless cancellation wins.
-					select {
-					case dest <- strings.TrimSuffix(line, "\n"):
-					case <-ctx.Done():
+					// Send log to aggeregator by calling the callback.
+					if err := cb(c.name, strings.TrimSuffix(line, "\n")); err != nil {
+						watcherErr <- err
 						return
 					}
 				}

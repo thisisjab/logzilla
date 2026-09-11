@@ -16,7 +16,7 @@ import (
 func main() {
 	agg, err := aggregator.New(aggregator.Config{
 		CollectorsPath: os.Getenv("COLLECTORS_PATH"),
-		Logger: shared.NewLogger(readLogLevel()),
+		Logger:         shared.NewLogger(readLogLevel()),
 	})
 
 	if err != nil {
@@ -27,9 +27,9 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	exitChan := make(chan os.Signal, 1)
 
-	go func ()  {
+	go func() {
 		signal.Notify(exitChan, syscall.SIGINT, syscall.SIGTERM)
-		<- exitChan
+		<-exitChan
 		cancel()
 	}()
 

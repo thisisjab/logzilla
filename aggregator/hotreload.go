@@ -3,7 +3,6 @@ package aggregator
 import (
 	"context"
 
-	"github.com/spf13/viper"
 	"github.com/thisisjab/logzilla/collector"
 )
 
@@ -28,7 +27,7 @@ type viperConfig struct {
 // loadConfig reads yaml file and updates config.
 func (agg *Aggregator) loadConfig(ctx context.Context) error {
 	var cfg viperConfig
-	if err := viper.Unmarshal(&cfg); err != nil {
+	if err := agg.v.Unmarshal(&cfg); err != nil {
 		return err
 	}
 
@@ -61,19 +60,19 @@ func (agg *Aggregator) updateConfig(ctx context.Context, newConfig viperConfig) 
 	}
 
 	// Rebuild and restart all configured collectors.
-	for name, cfg := range newConfig.Collectors {
+	for cName, cfg := range newConfig.Collectors {
 		// Let's consider nil IsActive as true since no one wants to pass is_active = true
 		active := cfg.IsActive == nil || *cfg.IsActive
 
-		parsed, err := collector.Build(cfg.Type, cfg.Args)
+		parsed, err := collector.Build(cName, cfg.Type, cfg.Args)
 		if err != nil {
-			agg.logger.Error("cannot build collector", "name", name, "error", err)
+			agg.logger.Error("cannot build collector", "name", cName, "error", err)
 			continue
 		}
 
 		// Stop previous instance if it existed.
-		if existing, exists := agg.collectors[name]; exists && existing.isActive {
-			agg.logger.Info("stopping collector", "name", name)
+		if existing, exists := agg.collectors[cName]; exists && existing.isActive {
+			agg.logger.Info("stopping collector", "name", cName)
 			existing.cancel()
 		}
 
@@ -87,15 +86,15 @@ func (agg *Aggregator) updateConfig(ctx context.Context, newConfig viperConfig) 
 			state.cancel = cancel
 
 			agg.collectorWg.Go(func() {
-				agg.logger.Info("starting collector", "name", name)
+				agg.logger.Info("starting collector", "name", cName)
 
-				err := parsed.Collect(collectorCtx, agg.logsChan)
+				err := parsed.Collect(collectorCtx, agg.cb)
 				if err != nil {
-					agg.logger.Error("error from collector", "name", name, "error", err)
+					agg.logger.Error("error from collector", "name", cName, "error", err)
 				}
 			})
 		}
 
-		agg.collectors[name] = state
+		agg.collectors[cName] = state
 	}
 }

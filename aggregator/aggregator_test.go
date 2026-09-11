@@ -46,11 +46,15 @@ func TestNew(t *testing.T) {
 	})
 
 	t.Run("success with valid config", func(t *testing.T) {
+		v := viper.New()
+		v.Set("wal.dir", t.TempDir())
+
 		logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
 		path := "config.yaml"
 		agg, err := New(Config{
 			Logger:         logger,
 			CollectorsPath: path,
+			Viper:          v,
 		})
 
 		assert.NoError(t, err)
@@ -58,16 +62,17 @@ func TestNew(t *testing.T) {
 		assert.Equal(t, logger, agg.logger)
 		assert.Equal(t, path, agg.collectorsPath)
 		assert.NotNil(t, agg.collectors)
-		assert.NotNil(t, agg.logsChan)
 	})
 }
 
 func TestAggregator_Ingest(t *testing.T) {
 	t.Run("invalid config initial setup returns with error", func(t *testing.T) {
-		defer viper.Reset()
+		v := viper.New()
+		v.Set("wal.dir", t.TempDir())
 		agg, err := New(Config{
 			Logger:         slog.New(slog.NewJSONHandler(io.Discard, nil)),
 			CollectorsPath: "nonexistent.yaml",
+			Viper:          v,
 		})
 		assert.NoError(t, err)
 
@@ -79,7 +84,8 @@ func TestAggregator_Ingest(t *testing.T) {
 	})
 
 	t.Run("with invalid yaml structure initial config load fails", func(t *testing.T) {
-		defer viper.Reset()
+		v := viper.New()
+		v.Set("wal.dir", t.TempDir())
 		tmpFile, err := os.CreateTemp("", "invalid_struct_*.yaml")
 		assert.NoError(t, err)
 		defer os.Remove(tmpFile.Name())
@@ -92,6 +98,7 @@ func TestAggregator_Ingest(t *testing.T) {
 		agg, err := New(Config{
 			Logger:         slog.New(slog.NewJSONHandler(io.Discard, nil)),
 			CollectorsPath: tmpFile.Name(),
+			Viper:          v,
 		})
 		assert.NoError(t, err)
 
@@ -103,7 +110,7 @@ func TestAggregator_Ingest(t *testing.T) {
 	})
 
 	t.Run("by updating config file config reloads", func(t *testing.T) {
-		defer viper.Reset()
+		walDir := t.TempDir()
 
 		// Create dummy files for file collector validation
 		log1, err := os.CreateTemp("", "log1_*.log")
@@ -118,13 +125,15 @@ func TestAggregator_Ingest(t *testing.T) {
 
 		// Initial config with c1 active
 		configContent := fmt.Sprintf(`
+wal:
+  dir: %s
 collectors:
   c1:
     type: file
     isActive: true
     args:
       path: %s
-`, log1.Name())
+`, walDir, log1.Name())
 
 		tmpConfigFile, err := os.CreateTemp("", "config_*.yaml")
 		assert.NoError(t, err)
@@ -160,6 +169,8 @@ collectors:
 		// 2. Add c2 (active)
 		// 3. Add c3 (inactive/disabled)
 		updatedConfigContent := fmt.Sprintf(`
+wal:
+  dir: %s
 collectors:
   c2:
     type: file
@@ -171,7 +182,7 @@ collectors:
     isActive: false
     args:
       path: %s
-`, log2.Name(), log1.Name())
+`, walDir, log2.Name(), log1.Name())
 
 		// Truncate and rewrite config file
 		f, err := os.OpenFile(tmpConfigFile.Name(), os.O_WRONLY|os.O_TRUNC, 0644)
@@ -197,7 +208,7 @@ collectors:
 	})
 
 	t.Run("on context.done all collectors are stopped", func(t *testing.T) {
-		defer viper.Reset()
+		walDir := t.TempDir()
 
 		logFile, err := os.CreateTemp("", "log_*.log")
 		assert.NoError(t, err)
@@ -205,13 +216,15 @@ collectors:
 		logFile.Close()
 
 		configContent := fmt.Sprintf(`
+wal:
+  dir: %s
 collectors:
   c1:
     type: file
     isActive: true
     args:
       path: %s
-`, logFile.Name())
+`, walDir, logFile.Name())
 
 		tmpConfigFile, err := os.CreateTemp("", "config_*.yaml")
 		assert.NoError(t, err)

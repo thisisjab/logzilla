@@ -2,9 +2,11 @@ package collector
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -20,17 +22,19 @@ func TestNewFileCollector(t *testing.T) {
 		require.NoError(t, err)
 
 		// Act
-		fc, err := NewFileCollector(path)
+		fc, err := NewFileCollector("app", path)
 
 		// Assert
 		assert.NoError(t, err)
 		assert.NotNil(t, fc)
+		assert.Equal(t, "app", fc.name)
+		assert.Equal(t, path, fc.path)
 	})
 
 	// Test FileCollector is not created when file does not exist.
 	t.Run("fails when file does not exist", func(t *testing.T) {
 		// Act
-		fc, err := NewFileCollector("/a/path/that/does/not/exist")
+		fc, err := NewFileCollector("app", "/a/path/that/does/not/exist")
 
 		// Assert
 		assert.Error(t, err)
@@ -46,7 +50,7 @@ func TestFileCollector_Collect(t *testing.T) {
 		_, err := os.Create(path)
 		require.NoError(t, err)
 
-		fc, err := NewFileCollector(path)
+		fc, err := NewFileCollector("app", path)
 		require.NoError(t, err)
 		require.NotNil(t, fc)
 
@@ -54,7 +58,7 @@ func TestFileCollector_Collect(t *testing.T) {
 		require.NoError(t, err)
 
 		// Act
-		err = fc.Collect(context.Background(), make(chan string, 1))
+		err = fc.Collect(context.Background(), func(cname, d string) error { return nil })
 
 		// Assert
 		assert.ErrorIs(t, err, os.ErrNotExist)
@@ -71,36 +75,46 @@ func TestFileCollector_Collect(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 
 		// Act: create collector and write to file after a short delay
-		fc, err := NewFileCollector(path)
+		fc, err := NewFileCollector("app", path)
 		require.NoError(t, err)
 
-		dest := make(chan string, 2)
-		collectErr := make(chan error)
+		type logEntry struct {
+			cname string
+			line  string
+		}
+		dest := make(chan logEntry, 2)
+		collectErr := make(chan error, 1)
 
 		go func() {
-			f, err := os.OpenFile(path, os.O_WRONLY|os.O_APPEND, 0644)
-			require.NoError(t, err)
-
-			_, err = f.WriteString("line1\nline2\n")
-			require.NoError(t, err, "cannot write to file")
-
-			f.Close()
+			collectErr <- fc.Collect(ctx, func(cname, d string) error {
+				dest <- logEntry{cname: cname, line: d}
+				return nil
+			})
 		}()
 
-		go func() {
-			collectErr <- fc.Collect(ctx, dest)
-		}()
+		// Wait briefly for the collector to open the file and start watching
+		time.Sleep(50 * time.Millisecond)
 
-		var lines []string
+		f, err := os.OpenFile(path, os.O_WRONLY|os.O_APPEND, 0644)
+		require.NoError(t, err)
+
+		_, err = f.WriteString("line1\nline2\n")
+		require.NoError(t, err, "cannot write to file")
+		f.Close()
+
+		var entries []logEntry
 		for range 2 {
-			lines = append(lines, <-dest)
+			entries = append(entries, <-dest)
 		}
 
 		cancel()
 
 		// Assert
 		assert.ErrorIs(t, <-collectErr, context.Canceled)
-		assert.Equal(t, []string{"line1", "line2"}, lines)
+		assert.Equal(t, []logEntry{
+			{cname: "app", line: "line1"},
+			{cname: "app", line: "line2"},
+		}, entries)
 	})
 
 	// Test FileCollector returns context.Canceled when context is cancelled.
@@ -111,7 +125,7 @@ func TestFileCollector_Collect(t *testing.T) {
 		_, err := os.Create(path)
 		require.NoError(t, err)
 
-		fc, err := NewFileCollector(path)
+		fc, err := NewFileCollector("app", path)
 		require.NoError(t, err)
 
 		ctx, cancel := context.WithCancel(context.Background())
@@ -120,7 +134,7 @@ func TestFileCollector_Collect(t *testing.T) {
 
 		// Act
 		collect := func() {
-			errChan <- fc.Collect(ctx, make(chan string, 1))
+			errChan <- fc.Collect(ctx, func(cname, d string) error { return nil })
 		}
 
 		go collect()
@@ -143,16 +157,21 @@ func TestFileCollector_Collect(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 
 		// Act
-		fc, err := NewFileCollector(path)
+		fc, err := NewFileCollector("app", path)
 		require.NoError(t, err)
 
-		collectErr := make(chan error)
+		collectErr := make(chan error, 1)
 		dest := make(chan string, 1)
 
 		go func() {
-			collectErr <- fc.Collect(ctx, dest)
+			collectErr <- fc.Collect(ctx, func(cname, d string) error {
+				dest <- d
+				return nil
+			})
 		}()
 
+		// Wait briefly for the collector to open the file and start watching
+		time.Sleep(50 * time.Millisecond)
 
 		f, err := os.OpenFile(path, os.O_WRONLY|os.O_APPEND, 0644)
 		require.NoError(t, err)
@@ -166,5 +185,48 @@ func TestFileCollector_Collect(t *testing.T) {
 		// Assert
 		assert.ErrorIs(t, <-collectErr, context.Canceled)
 		assert.Len(t, dest, 0)
+	})
+
+	// Test FileCollector stops and returns error when callback fails.
+	t.Run("returns error when callback fails", func(t *testing.T) {
+		// Arrange
+		path := filepath.Join(t.TempDir(), "app.log")
+
+		_, err := os.Create(path)
+		require.NoError(t, err)
+
+		fc, err := NewFileCollector("app", path)
+		require.NoError(t, err)
+
+		expectedErr := errors.New("storage write error")
+		collectErr := make(chan error, 1)
+
+		var receivedName string
+		// Act
+		go func() {
+			collectErr <- fc.Collect(context.Background(), func(cname, d string) error {
+				receivedName = cname
+				return expectedErr
+			})
+		}()
+
+		// Wait briefly for the collector to open the file and start watching
+		time.Sleep(50 * time.Millisecond)
+
+		f, err := os.OpenFile(path, os.O_WRONLY|os.O_APPEND, 0644)
+		require.NoError(t, err)
+
+		_, err = f.WriteString("log entry\n")
+		require.NoError(t, err, "cannot write to file")
+		f.Close()
+
+		// Assert
+		select {
+		case err := <-collectErr:
+			assert.ErrorIs(t, err, expectedErr)
+			assert.Equal(t, "app", receivedName)
+		case <-time.After(5 * time.Second):
+			t.Fatal("Collect did not exit on callback error")
+		}
 	})
 }
