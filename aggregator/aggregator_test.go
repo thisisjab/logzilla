@@ -54,7 +54,7 @@ func TestNew(t *testing.T) {
 		agg, err := New(Config{
 			Logger:         logger,
 			CollectorsPath: path,
-			Viper:          v,
+			viper:          v,
 		})
 
 		assert.NoError(t, err)
@@ -72,7 +72,7 @@ func TestAggregator_Ingest(t *testing.T) {
 		agg, err := New(Config{
 			Logger:         slog.New(slog.NewJSONHandler(io.Discard, nil)),
 			CollectorsPath: "nonexistent.yaml",
-			Viper:          v,
+			viper:          v,
 		})
 		assert.NoError(t, err)
 
@@ -98,7 +98,7 @@ func TestAggregator_Ingest(t *testing.T) {
 		agg, err := New(Config{
 			Logger:         slog.New(slog.NewJSONHandler(io.Discard, nil)),
 			CollectorsPath: tmpFile.Name(),
-			Viper:          v,
+			viper:          v,
 		})
 		assert.NoError(t, err)
 

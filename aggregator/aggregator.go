@@ -36,7 +36,7 @@ type Aggregator struct {
 type Config struct {
 	CollectorsPath string
 	Logger         *slog.Logger
-	Viper          *viper.Viper
+	viper          *viper.Viper
 }
 
 func New(cfg Config) (*Aggregator, error) {
@@ -52,8 +52,8 @@ func New(cfg Config) (*Aggregator, error) {
 		return nil, errors.New("collectors path must end in .yaml or .yml")
 	}
 
-	v := cfg.Viper
-	if v == nil {
+	v := cfg.viper
+	if v == nil { // NOTE: when testing, viper is passed by the test func
 		v = viper.New()
 	}
 
