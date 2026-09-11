@@ -11,6 +11,7 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/spf13/viper"
+	"github.com/thisisjab/logzilla/wal"
 )
 
 // Aggregator collects logs from collectors, stores in WALs,
@@ -28,7 +29,7 @@ type Aggregator struct {
 	// collectors holds list of collectors with their state.
 	collectors map[string]*collectorState
 	// wal handles persisting logs to disk.
-	wal *wal
+	wal *wal.WAL
 	// cb is the callback function for getting ingested logs from collectors.
 	cb func(collectorName, data string) error
 }
@@ -69,7 +70,7 @@ func New(cfg Config) (*Aggregator, error) {
 	walMaxBytes := v.GetUint("wal.max_bytes")
 	walSyncInterval := v.GetDuration("wal.sync_interval")
 
-	w, err := newWAL(walDir, walMaxBytes, walSyncInterval, cfg.Logger)
+	w, err := wal.New(walDir, walMaxBytes, walSyncInterval, cfg.Logger)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create WAL: %w", err)
 	}
@@ -84,7 +85,7 @@ func New(cfg Config) (*Aggregator, error) {
 	}
 
 	cb := func(collectorName, data string) error {
-		err := agg.wal.append(collectorName, data)
+		err := agg.wal.Append(encodeRecord(collectorName, data))
 
 		if err != nil {
 			return fmt.Errorf("cannot append to WAL: %w", err)
@@ -140,7 +141,7 @@ func (agg *Aggregator) Ingest(ctx context.Context) error {
 	agg.collectorWg.Wait()
 
 	if agg.wal != nil {
-		agg.wal.close()
+		agg.wal.Close()
 	}
 
 	return nil
