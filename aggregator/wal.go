@@ -14,7 +14,7 @@ import (
 )
 
 // record defines the binary wire format of each log entry inside the WAL:
-// [ULID (16 bytes)] [Collector Name Length (4 bytes)] [Collector Name] [Log Data Length (4 bytes)] [Log Data]
+// [UNIX Millisecond (8 Bytes)] [ULID (16 bytes)] [Collector Name Length (4 bytes)] [Collector Name] [Log Data Length (4 bytes)] [Log Data]
 type record []byte
 
 // wal implements a write-ahead log for persisting ingested collector logs to disk.
@@ -153,30 +153,34 @@ func (w *wal) append(collector, data string) error {
 }
 
 // encodeRecord marshals a collector identifier and log payload into the binary record layout:
-// [16B ULID] [4B BigEndian ColLen] [ColName] [4B BigEndian DataLen] [LogData]
+// [8B BigEndian UnixMilli] [16B ULID] [4B BigEndian ColLen] [ColName] [4B BigEndian DataLen] [LogData]
 func encodeRecord(collector, data string) record {
+	timestamp := uint64(time.Now().UnixMilli())
 	logID := ulid.Make()
 
 	colLen := uint32(len(collector))
 	dataLen := uint32(len(data))
 
-	totalLen := 16 + 4 + int(colLen) + 4 + int(dataLen)
+	totalLen := 8 + 16 + 4 + int(colLen) + 4 + int(dataLen)
 	rec := make(record, totalLen)
 
+	// Write Unix Milliseconds (8 bytes)
+	binary.BigEndian.PutUint64(rec[0:8], timestamp)
+
 	// Write ULID (16 bytes)
-	copy(rec[0:16], logID[:])
+	copy(rec[8:24], logID[:])
 
 	// Write Collector Name Length (4 bytes)
-	binary.BigEndian.PutUint32(rec[16:20], colLen)
+	binary.BigEndian.PutUint32(rec[24:28], colLen)
 
 	// Write Collector Name
-	copy(rec[20:20+colLen], collector)
+	copy(rec[28:28+colLen], collector)
 
 	// Write Log Data Length (4 bytes)
-	binary.BigEndian.PutUint32(rec[20+colLen:24+colLen], dataLen)
+	binary.BigEndian.PutUint32(rec[28+colLen:32+colLen], dataLen)
 
 	// Write Log Data
-	copy(rec[24+colLen:24+colLen+dataLen], data)
+	copy(rec[32+colLen:32+colLen+dataLen], data)
 
 	return rec
 }

@@ -147,22 +147,26 @@ func TestEncodeRecord(t *testing.T) {
 			rec := encodeRecord(tt.collector, tt.data)
 
 			// Verify total size matches expected:
-			// 16 bytes (ULID) + 4 bytes (collector len) + len(collector) + 4 bytes (data len) + len(data)
-			expectedSize := 16 + 4 + len(tt.collector) + 4 + len(tt.data)
+			// 8 bytes (UnixMilli) + 16 bytes (ULID) + 4 bytes (collector len) + len(collector) + 4 bytes (data len) + len(data)
+			expectedSize := 8 + 16 + 4 + len(tt.collector) + 4 + len(tt.data)
 			assert.Len(t, rec, expectedSize)
 
-			// Verify ULID (first 16 bytes) is non-zero and valid
+			// Verify Unix Milliseconds (first 8 bytes)
+			ts := binary.BigEndian.Uint64(rec[0:8])
+			assert.InDelta(t, time.Now().UnixMilli(), int64(ts), 1000)
+
+			// Verify ULID (next 16 bytes) is non-zero and valid
 			var id ulid.ULID
-			copy(id[:], rec[0:16])
+			copy(id[:], rec[8:24])
 			assert.NotEqual(t, ulid.ULID{}, id)
 
 			// Verify Collector Name Length and Collector Name bytes
-			colLen := binary.BigEndian.Uint32(rec[16:20])
+			colLen := binary.BigEndian.Uint32(rec[24:28])
 			assert.Equal(t, uint32(len(tt.collector)), colLen)
-			assert.Equal(t, []byte(tt.collector), []byte(rec[20:20+int(colLen)]))
+			assert.Equal(t, []byte(tt.collector), []byte(rec[28:28+int(colLen)]))
 
 			// Verify Log Data Length and Log Data bytes
-			dataOffset := 20 + int(colLen)
+			dataOffset := 28 + int(colLen)
 			dataLen := binary.BigEndian.Uint32(rec[dataOffset : dataOffset+4])
 			assert.Equal(t, uint32(len(tt.data)), dataLen)
 			assert.Equal(t, []byte(tt.data), []byte(rec[dataOffset+4:dataOffset+4+int(dataLen)]))
@@ -276,8 +280,8 @@ func TestAppend(t *testing.T) {
 		assert.Contains(t, string(data), "message 2")
 
 		// Total size must be sum of both encoded records:
-		expectedSize := (16 + 4 + len("collector_a") + 4 + len("message 1")) +
-			(16 + 4 + len("collector_b") + 4 + len("message 2"))
+		expectedSize := (8 + 16 + 4 + len("collector_a") + 4 + len("message 1")) +
+			(8 + 16 + 4 + len("collector_b") + 4 + len("message 2"))
 		assert.Len(t, data, expectedSize)
 	})
 
@@ -340,7 +344,7 @@ func TestAppend(t *testing.T) {
 			colName := fmt.Sprintf("collector_%d", i)
 			for j := range logsPerGoroutine {
 				logMsg := fmt.Sprintf("worker %d message %d", i, j)
-				expectedTotalBytes += 16 + 4 + len(colName) + 4 + len(logMsg)
+				expectedTotalBytes += 8 + 16 + 4 + len(colName) + 4 + len(logMsg)
 			}
 		}
 
@@ -371,7 +375,7 @@ func TestSync(t *testing.T) {
 
 		initialFileName := w.file.Name()
 
-		// Append record of size 16 + 4 + 2 + 4 + 4 = 30 bytes (< 100)
+		// Append record of size 8 + 16 + 4 + 2 + 4 + 4 = 38 bytes (< 100)
 		err = w.append("c1", "test")
 		assert.NoError(t, err)
 
@@ -390,14 +394,14 @@ func TestSync(t *testing.T) {
 		initialFile := w.file
 		initialFileName := initialFile.Name()
 
-		// 1. First record: 30 bytes (< 50)
+		// 1. First record: 38 bytes (< 50)
 		err = w.append("c1", "test")
 		assert.NoError(t, err)
 
 		w.sync()
 		assert.Equal(t, initialFileName, w.file.Name(), "should not rotate when size < maxBytes")
 
-		// 2. Second record: total size now 60 bytes (>= 50)
+		// 2. Second record: total size now 76 bytes (>= 50)
 		err = w.append("c1", "test")
 		assert.NoError(t, err)
 
@@ -414,10 +418,10 @@ func TestSync(t *testing.T) {
 		// - Old file was synced and closed
 		assert.ErrorIs(t, initialFile.Sync(), os.ErrClosed)
 
-		// - Old file on disk contains all 60 bytes
+		// - Old file on disk contains all 76 bytes
 		oldFileInfo, err := os.Stat(initialFileName)
 		assert.NoError(t, err)
-		assert.Equal(t, int64(60), oldFileInfo.Size())
+		assert.Equal(t, int64(76), oldFileInfo.Size())
 	})
 
 	t.Run("background ticker automatically rotates file when maxBytes exceeded", func(t *testing.T) {
@@ -429,7 +433,7 @@ func TestSync(t *testing.T) {
 
 		initialFileName := w.file.Name()
 
-		// Write enough to exceed 50 bytes (30 + 30 = 60 bytes)
+		// Write enough to exceed 50 bytes (39 + 39 = 78 bytes)
 		err = w.append("c1", "test1")
 		assert.NoError(t, err)
 		err = w.append("c1", "test2")
@@ -481,7 +485,7 @@ func TestClose(t *testing.T) {
 		assert.Contains(t, string(data), "collector_test")
 		assert.Contains(t, string(data), "closing data payload")
 
-		expectedSize := 16 + 4 + len("collector_test") + 4 + len("closing data payload")
+		expectedSize := 8 + 16 + 4 + len("collector_test") + 4 + len("closing data payload")
 		assert.Len(t, data, expectedSize)
 	})
 }
