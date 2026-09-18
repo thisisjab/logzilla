@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package aggregator.v1;
+
+option go_package = "github.com/thisisjab/logzilla/gen/aggregator/v1;aggregatorv1";
+
+service AggregatorService {
+  rpc PollWAL(PollWALRequest) returns (stream PollWALResponse);
+}
+
+message PollWALRequest {
+  int64 last_wal_id = 1;
+}
+
+message PollWALResponse {
+  int64 wal_id = 1;
+  bytes data = 2;
+}

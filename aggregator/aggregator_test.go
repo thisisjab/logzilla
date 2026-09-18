@@ -5,13 +5,23 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 )
+
+func getFreePort(t *testing.T) int {
+	t.Helper()
+	lis, err := net.Listen("tcp", "127.0.0.1:0")
+	assert.NoError(t, err)
+	defer lis.Close()
+	return lis.Addr().(*net.TCPAddr).Port
+}
 
 func TestNew(t *testing.T) {
 	t.Run("returns error with nil logger", func(t *testing.T) {
@@ -63,6 +73,60 @@ func TestNew(t *testing.T) {
 		assert.Equal(t, path, agg.collectorsPath)
 		assert.NotNil(t, agg.collectors)
 	})
+}
+
+func TestAggregator_PollWAL(t *testing.T) {
+	walDir := t.TempDir()
+	v := viper.New()
+	v.Set("wal.dir", walDir)
+
+	tmpConfigFile, err := os.CreateTemp("", "agg_config_*.yaml")
+	assert.NoError(t, err)
+	defer os.Remove(tmpConfigFile.Name())
+	_, err = fmt.Fprintf(tmpConfigFile, "wal:\n  dir: %s\ncollectors: {}\n", walDir)
+	assert.NoError(t, err)
+	tmpConfigFile.Close()
+
+	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
+	agg, err := New(Config{
+		Logger:         logger,
+		CollectorsPath: tmpConfigFile.Name(),
+		viper:          v,
+	})
+	assert.NoError(t, err)
+
+	// Write segments
+	f1Data := []byte("seg 1")
+	f2Data := []byte("seg 2")
+	assert.NoError(t, os.WriteFile(filepath.Join(walDir, "1000.wal"), f1Data, 0644))
+	assert.NoError(t, os.WriteFile(filepath.Join(walDir, "2000.wal"), f2Data, 0644))
+
+	// Initial poll with lastWalID = 0
+	ch := agg.PollWAL(context.Background(), 0)
+	var segs []WALSegment
+	for s := range ch {
+		assert.NoError(t, s.Err)
+		segs = append(segs, s)
+	}
+	assert.Len(t, segs, 2)
+	assert.Equal(t, int64(1000), segs[0].ID)
+	assert.Equal(t, f1Data, segs[0].Data)
+	assert.Equal(t, int64(2000), segs[1].ID)
+	assert.Equal(t, f2Data, segs[1].Data)
+
+	// Subsequent poll with lastWalID = 1000
+	ch2 := agg.PollWAL(context.Background(), 1000)
+	var segs2 []WALSegment
+	for s := range ch2 {
+		assert.NoError(t, s.Err)
+		segs2 = append(segs2, s)
+	}
+	assert.Len(t, segs2, 1)
+	assert.Equal(t, int64(2000), segs2[0].ID)
+
+	// 1000.wal should have been deleted
+	assert.NoFileExists(t, filepath.Join(walDir, "1000.wal"))
+	assert.FileExists(t, filepath.Join(walDir, "2000.wal"))
 }
 
 func TestAggregator_Ingest(t *testing.T) {
@@ -158,8 +222,8 @@ collectors:
 
 		// Wait for c1 to be created and active
 		assert.Eventually(t, func() bool {
-			agg.mu.RLock()
-			defer agg.mu.RUnlock()
+			agg.collectorsMu.RLock()
+			defer agg.collectorsMu.RUnlock()
 			c, exists := agg.collectors["c1"]
 			return exists && c.isActive
 		}, 5*time.Second, 100*time.Millisecond)
@@ -198,8 +262,8 @@ collectors:
 		// c2 should be active
 		// c3 should be inactive
 		assert.Eventually(t, func() bool {
-			agg.mu.RLock()
-			defer agg.mu.RUnlock()
+			agg.collectorsMu.RLock()
+			defer agg.collectorsMu.RUnlock()
 			_, c1Exists := agg.collectors["c1"]
 			c2, c2Exists := agg.collectors["c2"]
 			c3, c3Exists := agg.collectors["c3"]
@@ -249,8 +313,8 @@ collectors:
 
 		// Wait for collector to start
 		assert.Eventually(t, func() bool {
-			agg.mu.RLock()
-			defer agg.mu.RUnlock()
+			agg.collectorsMu.RLock()
+			defer agg.collectorsMu.RUnlock()
 			c, exists := agg.collectors["c1"]
 			return exists && c.isActive
 		}, 5*time.Second, 100*time.Millisecond)

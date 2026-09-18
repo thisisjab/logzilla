@@ -18,13 +18,14 @@ type Record []byte
 // WAL implements a write-ahead log for persisting ingested collector logs to disk.
 // It manages sequential file rotation based on size thresholds and periodic fsync intervals.
 type WAL struct {
-	logger   *slog.Logger
-	maxBytes uint
-	ticker   *time.Ticker
-	stopCh   chan struct{}
-	dir      string
-	file     *os.File
-	mu       sync.Mutex
+	logger    *slog.Logger
+	maxBytes  uint
+	ticker    *time.Ticker
+	stopCh    chan struct{}
+	dir       string
+	file      *os.File
+	mu        sync.Mutex
+	closeOnce sync.Once
 }
 
 // New creates and initializes a new WAL instance in the specified directory.
@@ -78,12 +79,41 @@ func New(dir string, maxBytes uint, syncInterval time.Duration, logger *slog.Log
 	return w, nil
 }
 
+// ActiveFileName returns the base name of the active WAL file currently being written to.
+func (w *WAL) ActiveFileName() string {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	if w.file == nil {
+		return ""
+	}
+	return filepath.Base(w.file.Name())
+}
+
+// Dir returns the root directory path of the WAL.
+func (w *WAL) Dir() string {
+	return w.dir
+}
+
 // Close stops the background sync ticker and performs a final sync of the active WAL file.
 func (w *WAL) Close() {
-	w.ticker.Stop()
-	close(w.stopCh)
+	w.closeOnce.Do(func() {
+		w.ticker.Stop()
+		close(w.stopCh)
 
-	w.sync()
+		w.mu.Lock()
+		defer w.mu.Unlock()
+
+		if w.file != nil {
+			if err := w.file.Sync(); err != nil {
+				w.logger.Error("cannot sync WAL file", "file", w.file.Name(), "error", err)
+			}
+			if err := w.file.Close(); err != nil {
+				w.logger.Error("cannot close WAL file", "file", w.file.Name(), "error", err)
+			}
+			w.file = nil
+		}
+	})
 }
 
 // sync flushes in-memory file buffers to disk (fsync).
@@ -139,6 +169,10 @@ func (w *WAL) rotate() error {
 func (w *WAL) Append(rec Record) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
+
+	if w.file == nil {
+		return errors.New("wal is closed")
+	}
 
 	if _, err := w.file.Write(rec); err != nil {
 		return fmt.Errorf("cannot store log: %w", err)

@@ -1,19 +1,19 @@
 repos:
   - repo: https://github.com/compilerla/conventional-pre-commit
-    rev: v3.6.0
+    rev: v4.4.0
     hooks:
       - id: conventional-pre-commit
         stages: [commit-msg]
         args: []
 
   - repo: https://github.com/golangci/golangci-lint
-    rev: v2.5.0
+    rev: v2.13.2
     hooks:
       - id: golangci-lint
         args: [--fix, --timeout, 5m]
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
+    rev: v6.0.0
     hooks:
       - id: trailing-whitespace
       - id: end-of-file-fixer

@@ -416,3 +416,46 @@ func TestClose(t *testing.T) {
 		assert.Len(t, data, len(rec))
 	})
 }
+
+func TestActiveFileName(t *testing.T) {
+	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
+
+	t.Run("returns empty string when file is nil", func(t *testing.T) {
+		w := &WAL{dir: t.TempDir(), logger: logger}
+		assert.Equal(t, "", w.ActiveFileName())
+	})
+
+	t.Run("returns base name of active file and updates on rotation", func(t *testing.T) {
+		dir := t.TempDir()
+		w, err := New(dir, 1024, 100*time.Millisecond, logger)
+		assert.NoError(t, err)
+		defer w.Close()
+
+		name1 := w.ActiveFileName()
+		assert.NotEmpty(t, name1)
+		assert.Equal(t, filepath.Base(w.file.Name()), name1)
+		assert.True(t, strings.HasSuffix(name1, ".wal"))
+
+		time.Sleep(2 * time.Millisecond)
+
+		w.mu.Lock()
+		err = w.rotate()
+		w.mu.Unlock()
+		assert.NoError(t, err)
+
+		name2 := w.ActiveFileName()
+		assert.NotEmpty(t, name2)
+		assert.NotEqual(t, name1, name2)
+		assert.Equal(t, filepath.Base(w.file.Name()), name2)
+	})
+}
+
+func TestDir(t *testing.T) {
+	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
+	dir := t.TempDir()
+	w, err := New(dir, 1024, 100*time.Millisecond, logger)
+	assert.NoError(t, err)
+	defer w.Close()
+
+	assert.Equal(t, dir, w.Dir())
+}

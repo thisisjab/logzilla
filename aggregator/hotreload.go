@@ -17,6 +17,7 @@ type collectorState struct {
 
 // viperConfig is the struct that is expected from config file.
 type viperConfig struct {
+	GRPCPort   int `mapstructure:"grpcPort"`
 	Collectors map[string]struct {
 		Type     string         `mapstructure:"type"`
 		IsActive *bool          `mapstructure:"isActive"`
@@ -43,8 +44,8 @@ func (agg *Aggregator) updateConfig(ctx context.Context, newConfig viperConfig) 
 	// A future version should diff the old and new configs and only restart
 	// collectors whose configuration actually changed.
 
-	agg.mu.Lock()
-	defer agg.mu.Unlock()
+	agg.collectorsMu.Lock()
+	defer agg.collectorsMu.Unlock()
 
 	// Remove collectors that no longer exist.
 	for name, existing := range agg.collectors {
