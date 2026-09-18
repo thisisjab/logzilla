@@ -1,4 +1,4 @@
-package aggregator
+package ingestor
 
 import (
 	"context"
@@ -6,7 +6,7 @@ import (
 	"github.com/thisisjab/logzilla/collector"
 )
 
-// collectorState holds all the current collectors of an aggregator.
+// collectorState holds all the current collectors of an ingestor.
 type collectorState struct {
 	isActive bool
 	// ref holds a pointer to the actual collector.
@@ -26,37 +26,37 @@ type viperConfig struct {
 }
 
 // loadConfig reads yaml file and updates config.
-func (agg *Aggregator) loadConfig(ctx context.Context) error {
+func (ing *Ingestor) loadConfig(ctx context.Context) error {
 	var cfg viperConfig
-	if err := agg.v.Unmarshal(&cfg); err != nil {
+	if err := ing.v.Unmarshal(&cfg); err != nil {
 		return err
 	}
 
-	agg.updateConfig(ctx, cfg)
+	ing.updateConfig(ctx, cfg)
 
 	return nil
 }
 
 // updateConfig reads updated yaml config file and starts/stops/modify collectors.
-func (agg *Aggregator) updateConfig(ctx context.Context, newConfig viperConfig) {
+func (ing *Ingestor) updateConfig(ctx context.Context, newConfig viperConfig) {
 	// NOTE:
 	// Any config file change currently rebuilds and restarts all collectors.
 	// A future version should diff the old and new configs and only restart
 	// collectors whose configuration actually changed.
 
-	agg.collectorsMu.Lock()
-	defer agg.collectorsMu.Unlock()
+	ing.collectorsMu.Lock()
+	defer ing.collectorsMu.Unlock()
 
 	// Remove collectors that no longer exist.
-	for name, existing := range agg.collectors {
+	for name, existing := range ing.collectors {
 		if _, exists := newConfig.Collectors[name]; !exists {
 			if existing.isActive {
-				agg.logger.Info("stopping collector", "name", name)
+				ing.logger.Info("stopping collector", "name", name)
 				existing.cancel()
 			}
 
-			agg.logger.Info("collector removed", "name", name)
-			delete(agg.collectors, name)
+			ing.logger.Info("collector removed", "name", name)
+			delete(ing.collectors, name)
 		}
 	}
 
@@ -67,13 +67,13 @@ func (agg *Aggregator) updateConfig(ctx context.Context, newConfig viperConfig) 
 
 		parsed, err := collector.Build(cName, cfg.Type, cfg.Args)
 		if err != nil {
-			agg.logger.Error("cannot build collector", "name", cName, "error", err)
+			ing.logger.Error("cannot build collector", "name", cName, "error", err)
 			continue
 		}
 
 		// Stop previous instance if it existed.
-		if existing, exists := agg.collectors[cName]; exists && existing.isActive {
-			agg.logger.Info("stopping collector", "name", cName)
+		if existing, exists := ing.collectors[cName]; exists && existing.isActive {
+			ing.logger.Info("stopping collector", "name", cName)
 			existing.cancel()
 		}
 
@@ -86,16 +86,16 @@ func (agg *Aggregator) updateConfig(ctx context.Context, newConfig viperConfig) 
 			collectorCtx, cancel := context.WithCancel(ctx)
 			state.cancel = cancel
 
-			agg.collectorWg.Go(func() {
-				agg.logger.Info("starting collector", "name", cName)
+			ing.collectorWg.Go(func() {
+				ing.logger.Info("starting collector", "name", cName)
 
-				err := parsed.Collect(collectorCtx, agg.cb)
+				err := parsed.Collect(collectorCtx, ing.cb)
 				if err != nil {
-					agg.logger.Error("error from collector", "name", cName, "error", err)
+					ing.logger.Error("error from collector", "name", cName, "error", err)
 				}
 			})
 		}
 
-		agg.collectors[cName] = state
+		ing.collectors[cName] = state
 	}
 }

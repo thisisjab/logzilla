@@ -1,10 +1,10 @@
 syntax = "proto3";
 
-package aggregator.v1;
+package ingestor.v1;
 
-option go_package = "github.com/thisisjab/logzilla/gen/aggregator/v1;aggregatorv1";
+option go_package = "github.com/thisisjab/logzilla/gen/ingestor/v1;ingestorv1";
 
-service AggregatorService {
+service IngestorService {
   rpc PollWAL(PollWALRequest) returns (stream PollWALResponse);
 }
 

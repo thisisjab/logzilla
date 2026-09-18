@@ -1,4 +1,4 @@
-package aggregator
+package ingestor
 
 import (
 	"context"
@@ -25,9 +25,9 @@ type WALSegment struct {
 	Err  error
 }
 
-// Aggregator collects logs from collectors, stores in WALs,
+// Ingestor collects logs from collectors, stores in WALs,
 // and eventually sends WALs to the cluster node to be stored.
-type Aggregator struct {
+type Ingestor struct {
 	v      *viper.Viper
 	logger *slog.Logger
 	// collectorsPath defines the yaml file that collectors and cluster nodes are read from.
@@ -53,7 +53,7 @@ type Config struct {
 	viper          *viper.Viper
 }
 
-func New(cfg Config) (*Aggregator, error) {
+func New(cfg Config) (*Ingestor, error) {
 	if cfg.Logger == nil {
 		return nil, errors.New("logger is nil")
 	}
@@ -90,7 +90,7 @@ func New(cfg Config) (*Aggregator, error) {
 		return nil, fmt.Errorf("cannot create WAL: %w", err)
 	}
 
-	agg := &Aggregator{
+	ing := &Ingestor{
 		v:              v,
 		logger:         cfg.Logger,
 		collectorsPath: cfg.CollectorsPath,
@@ -100,7 +100,7 @@ func New(cfg Config) (*Aggregator, error) {
 	}
 
 	cb := func(collectorName, data string) error {
-		err := agg.wal.Append(encodeRecord(collectorName, data))
+		err := ing.wal.Append(encodeRecord(collectorName, data))
 
 		if err != nil {
 			return fmt.Errorf("cannot append to WAL: %w", err)
@@ -109,23 +109,23 @@ func New(cfg Config) (*Aggregator, error) {
 		return nil
 	}
 
-	agg.cb = cb
+	ing.cb = cb
 
-	return agg, nil
+	return ing, nil
 }
 
 // PollWAL polls unread closed WAL files and streams them through a channel.
 // Implements the WALPoller interface needed by the gRPC service.
-func (agg *Aggregator) PollWAL(ctx context.Context, lastWalID int64) <-chan WALSegment {
+func (ing *Ingestor) PollWAL(ctx context.Context, lastWalID int64) <-chan WALSegment {
 	ch := make(chan WALSegment)
 
 	go func() {
 		defer close(ch)
 
-		agg.pollMu.Lock()
-		defer agg.pollMu.Unlock()
+		ing.pollMu.Lock()
+		defer ing.pollMu.Unlock()
 
-		if agg.wal == nil {
+		if ing.wal == nil {
 			select {
 			case ch <- WALSegment{Err: errors.New("wal is not initialized")}:
 			case <-ctx.Done():
@@ -133,7 +133,7 @@ func (agg *Aggregator) PollWAL(ctx context.Context, lastWalID int64) <-chan WALS
 			return
 		}
 
-		dir := agg.wal.Dir()
+		dir := ing.wal.Dir()
 		entries, err := os.ReadDir(dir)
 		if err != nil {
 			select {
@@ -143,7 +143,7 @@ func (agg *Aggregator) PollWAL(ctx context.Context, lastWalID int64) <-chan WALS
 			return
 		}
 
-		activeFile := agg.wal.ActiveFileName()
+		activeFile := ing.wal.ActiveFileName()
 		type walCandidate struct {
 			id   int64
 			name string
@@ -162,14 +162,14 @@ func (agg *Aggregator) PollWAL(ctx context.Context, lastWalID int64) <-chan WALS
 			idStr := strings.TrimSuffix(name, ".wal")
 			id, err := strconv.ParseInt(idStr, 10, 64)
 			if err != nil {
-				agg.logger.Warn("skipping WAL file with invalid timestamp filename", "file", name, "error", err)
+				ing.logger.Warn("skipping WAL file with invalid timestamp filename", "file", name, "error", err)
 				continue
 			}
 
 			if lastWalID > 0 && id <= lastWalID {
 				filePath := filepath.Join(dir, name)
 				if err := os.Remove(filePath); err != nil && !os.IsNotExist(err) {
-					agg.logger.Error("failed to remove acknowledged WAL file", "file", filePath, "error", err)
+					ing.logger.Error("failed to remove acknowledged WAL file", "file", filePath, "error", err)
 				}
 				continue
 			}
@@ -191,7 +191,7 @@ func (agg *Aggregator) PollWAL(ctx context.Context, lastWalID int64) <-chan WALS
 			}
 
 			// Re-check active file name in case rotation happened
-			if cand.name == agg.wal.ActiveFileName() {
+			if cand.name == ing.wal.ActiveFileName() {
 				continue
 			}
 
@@ -219,47 +219,47 @@ func (agg *Aggregator) PollWAL(ctx context.Context, lastWalID int64) <-chan WALS
 	return ch
 }
 
-func (agg *Aggregator) Ingest(ctx context.Context) error {
+func (ing *Ingestor) Ingest(ctx context.Context) error {
 	defer func() {
-		agg.collectorsMu.Lock()
-		for name, c := range agg.collectors {
+		ing.collectorsMu.Lock()
+		for name, c := range ing.collectors {
 			if c.cancel != nil {
-				agg.logger.Info("stopping collector", "name", name)
+				ing.logger.Info("stopping collector", "name", name)
 				c.cancel()
 			}
 		}
-		agg.collectorsMu.Unlock()
-		agg.collectorWg.Wait()
-		if agg.wal != nil {
-			agg.wal.Close()
+		ing.collectorsMu.Unlock()
+		ing.collectorWg.Wait()
+		if ing.wal != nil {
+			ing.wal.Close()
 		}
 	}()
 
-	agg.v.SetConfigFile(agg.collectorsPath)
+	ing.v.SetConfigFile(ing.collectorsPath)
 
-	if err := agg.v.ReadInConfig(); err != nil {
+	if err := ing.v.ReadInConfig(); err != nil {
 		return fmt.Errorf("cannot read config: %w", err)
 	}
 
 	// Load initial config
-	if err := agg.loadConfig(ctx); err != nil {
+	if err := ing.loadConfig(ctx); err != nil {
 		return fmt.Errorf("failed to load initial config: %w", err)
 	}
 
 	// Watch for any change
-	agg.v.OnConfigChange(func(in fsnotify.Event) {
-		if err := agg.v.ReadInConfig(); err != nil {
-			agg.logger.Error("cannot read config", "error", err)
+	ing.v.OnConfigChange(func(in fsnotify.Event) {
+		if err := ing.v.ReadInConfig(); err != nil {
+			ing.logger.Error("cannot read config", "error", err)
 			return
 		}
 
-		err := agg.loadConfig(ctx)
+		err := ing.loadConfig(ctx)
 		if err != nil {
-			agg.logger.Error("cannot load config", "error", err)
+			ing.logger.Error("cannot load config", "error", err)
 			return
 		}
 	})
-	agg.v.WatchConfig()
+	ing.v.WatchConfig()
 
 	<-ctx.Done()
 

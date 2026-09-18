@@ -1,4 +1,4 @@
-package aggregator
+package ingestor
 
 import (
 	"context"
@@ -15,17 +15,17 @@ import (
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	aggregatorv1 "github.com/thisisjab/logzilla/gen/aggregator/v1"
+	ingestorv1 "github.com/thisisjab/logzilla/gen/ingestor/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-func newTestServer(t *testing.T, walDir string) (*Aggregator, *GRPCServer, context.CancelFunc, context.CancelFunc) {
+func newTestServer(t *testing.T, walDir string) (*Ingestor, *GRPCServer, context.CancelFunc, context.CancelFunc) {
 	t.Helper()
 	v := viper.New()
 	v.Set("wal.dir", walDir)
 
-	tmpConfigFile, err := os.CreateTemp("", "agg_config_*.yaml")
+	tmpConfigFile, err := os.CreateTemp("", "ing_config_*.yaml")
 	require.NoError(t, err)
 	t.Cleanup(func() { os.Remove(tmpConfigFile.Name()) })
 
@@ -34,7 +34,7 @@ func newTestServer(t *testing.T, walDir string) (*Aggregator, *GRPCServer, conte
 	tmpConfigFile.Close()
 
 	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
-	agg, err := New(Config{
+	ing, err := New(Config{
 		Logger:         logger,
 		CollectorsPath: tmpConfigFile.Name(),
 		viper:          v,
@@ -43,23 +43,23 @@ func newTestServer(t *testing.T, walDir string) (*Aggregator, *GRPCServer, conte
 
 	server, err := NewGRPCServer(GRPCServerConfig{
 		Port:   getFreePort(t),
-		Poller: agg,
+		Poller: ing,
 		Logger: logger,
 	})
 	require.NoError(t, err)
 
 	grpcCtx, cancelGRPC := context.WithCancel(context.Background())
-	aggCtx, cancelAgg := context.WithCancel(context.Background())
+	ingCtx, cancelIng := context.WithCancel(context.Background())
 
 	go func() { _ = server.Run(grpcCtx) }()
-	go func() { _ = agg.Ingest(aggCtx) }()
+	go func() { _ = ing.Ingest(ingCtx) }()
 
 	t.Cleanup(func() {
 		cancelGRPC()
-		cancelAgg()
+		cancelIng()
 	})
 
-	return agg, server, cancelGRPC, cancelAgg
+	return ing, server, cancelGRPC, cancelIng
 }
 
 func TestNewGRPCServer_Validation(t *testing.T) {
@@ -79,7 +79,7 @@ func TestNewGRPCServer_Validation(t *testing.T) {
 	t.Run("returns error when logger is nil", func(t *testing.T) {
 		s, err := NewGRPCServer(GRPCServerConfig{
 			Port:   9393,
-			Poller: &Aggregator{},
+			Poller: &Ingestor{},
 			Logger: nil,
 		})
 		assert.Nil(t, s)
@@ -90,7 +90,7 @@ func TestNewGRPCServer_Validation(t *testing.T) {
 	t.Run("returns error with privileged port <= 1024", func(t *testing.T) {
 		s, err := NewGRPCServer(GRPCServerConfig{
 			Port:   80,
-			Poller: &Aggregator{},
+			Poller: &Ingestor{},
 			Logger: logger,
 		})
 		assert.Nil(t, s)
@@ -114,11 +114,11 @@ func TestGRPCServer_StartupAndShutdown(t *testing.T) {
 	require.NoError(t, err)
 	defer conn.Close()
 
-	client := aggregatorv1.NewAggregatorServiceClient(conn)
+	client := ingestorv1.NewIngestorServiceClient(conn)
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	stream, err := client.PollWAL(ctx, &aggregatorv1.PollWALRequest{LastWalId: 0})
+	stream, err := client.PollWAL(ctx, &ingestorv1.PollWALRequest{LastWalId: 0})
 	require.NoError(t, err)
 
 	_, err = stream.Recv()
@@ -137,10 +137,10 @@ func TestGRPCServer_StartupAndShutdown(t *testing.T) {
 			return true
 		}
 		defer testConn.Close()
-		testClient := aggregatorv1.NewAggregatorServiceClient(testConn)
+		testClient := ingestorv1.NewIngestorServiceClient(testConn)
 		pollCtx, pollCancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
 		defer pollCancel()
-		testStream, pollErr := testClient.PollWAL(pollCtx, &aggregatorv1.PollWALRequest{LastWalId: 0})
+		testStream, pollErr := testClient.PollWAL(pollCtx, &ingestorv1.PollWALRequest{LastWalId: 0})
 		if pollErr != nil {
 			return true
 		}
@@ -151,7 +151,7 @@ func TestGRPCServer_StartupAndShutdown(t *testing.T) {
 
 func TestGRPCServer_PollWAL_InitialPoll(t *testing.T) {
 	walDir := t.TempDir()
-	agg, server, _, _ := newTestServer(t, walDir)
+	ing, server, _, _ := newTestServer(t, walDir)
 
 	// Write two closed WAL files
 	f1Data := []byte("segment 1000 data")
@@ -159,7 +159,7 @@ func TestGRPCServer_PollWAL_InitialPoll(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(walDir, "1000.wal"), f1Data, 0644))
 	require.NoError(t, os.WriteFile(filepath.Join(walDir, "2000.wal"), f2Data, 0644))
 
-	activeFileName := agg.wal.ActiveFileName()
+	activeFileName := ing.wal.ActiveFileName()
 	require.NotEmpty(t, activeFileName)
 
 	conn, err := grpc.NewClient(
@@ -169,15 +169,15 @@ func TestGRPCServer_PollWAL_InitialPoll(t *testing.T) {
 	require.NoError(t, err)
 	defer conn.Close()
 
-	client := aggregatorv1.NewAggregatorServiceClient(conn)
+	client := ingestorv1.NewIngestorServiceClient(conn)
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
 	// Initial poll with last_wal_id = 0
-	stream, err := client.PollWAL(ctx, &aggregatorv1.PollWALRequest{LastWalId: 0})
+	stream, err := client.PollWAL(ctx, &ingestorv1.PollWALRequest{LastWalId: 0})
 	require.NoError(t, err)
 
-	var received []*aggregatorv1.PollWALResponse
+	var received []*ingestorv1.PollWALResponse
 	for {
 		resp, recvErr := stream.Recv()
 		if recvErr == io.EOF {
@@ -207,7 +207,7 @@ func TestGRPCServer_PollWAL_InitialPoll(t *testing.T) {
 
 func TestGRPCServer_PollWAL_SubsequentPoll(t *testing.T) {
 	walDir := t.TempDir()
-	agg, server, _, _ := newTestServer(t, walDir)
+	ing, server, _, _ := newTestServer(t, walDir)
 
 	// Write three closed WAL files
 	f1Data := []byte("segment 1000 data")
@@ -217,7 +217,7 @@ func TestGRPCServer_PollWAL_SubsequentPoll(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(walDir, "2000.wal"), f2Data, 0644))
 	require.NoError(t, os.WriteFile(filepath.Join(walDir, "3000.wal"), f3Data, 0644))
 
-	activeFileName := agg.wal.ActiveFileName()
+	activeFileName := ing.wal.ActiveFileName()
 	require.NotEmpty(t, activeFileName)
 
 	conn, err := grpc.NewClient(
@@ -227,15 +227,15 @@ func TestGRPCServer_PollWAL_SubsequentPoll(t *testing.T) {
 	require.NoError(t, err)
 	defer conn.Close()
 
-	client := aggregatorv1.NewAggregatorServiceClient(conn)
+	client := ingestorv1.NewIngestorServiceClient(conn)
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
 	// Subsequent poll with last_wal_id = 2000
-	stream, err := client.PollWAL(ctx, &aggregatorv1.PollWALRequest{LastWalId: 2000})
+	stream, err := client.PollWAL(ctx, &ingestorv1.PollWALRequest{LastWalId: 2000})
 	require.NoError(t, err)
 
-	var received []*aggregatorv1.PollWALResponse
+	var received []*ingestorv1.PollWALResponse
 	for {
 		resp, recvErr := stream.Recv()
 		if recvErr == io.EOF {
@@ -270,12 +270,12 @@ func TestGRPCServer_PollWAL_Empty(t *testing.T) {
 	require.NoError(t, err)
 	defer conn.Close()
 
-	client := aggregatorv1.NewAggregatorServiceClient(conn)
+	client := ingestorv1.NewIngestorServiceClient(conn)
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
 	// PollWAL when only active segment exists
-	stream, err := client.PollWAL(ctx, &aggregatorv1.PollWALRequest{LastWalId: 0})
+	stream, err := client.PollWAL(ctx, &ingestorv1.PollWALRequest{LastWalId: 0})
 	require.NoError(t, err)
 
 	resp, err := stream.Recv()
@@ -299,11 +299,11 @@ func TestGRPCServer_PollWAL_ChronologicalOrder(t *testing.T) {
 	require.NoError(t, err)
 	defer conn.Close()
 
-	client := aggregatorv1.NewAggregatorServiceClient(conn)
+	client := ingestorv1.NewIngestorServiceClient(conn)
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	stream, err := client.PollWAL(ctx, &aggregatorv1.PollWALRequest{LastWalId: 0})
+	stream, err := client.PollWAL(ctx, &ingestorv1.PollWALRequest{LastWalId: 0})
 	require.NoError(t, err)
 
 	var ids []int64

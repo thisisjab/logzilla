@@ -2,9 +2,9 @@
 // versions:
 // 	protoc-gen-go v1.36.12
 // 	protoc        (unknown)
-// source: aggregator/v1/aggregator.proto
+// source: ingestor/v1/ingestor.proto
 
-package aggregatorv1
+package ingestorv1
 
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
@@ -30,7 +30,7 @@ type PollWALRequest struct {
 
 func (x *PollWALRequest) Reset() {
 	*x = PollWALRequest{}
-	mi := &file_aggregator_v1_aggregator_proto_msgTypes[0]
+	mi := &file_ingestor_v1_ingestor_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -42,7 +42,7 @@ func (x *PollWALRequest) String() string {
 func (*PollWALRequest) ProtoMessage() {}
 
 func (x *PollWALRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aggregator_v1_aggregator_proto_msgTypes[0]
+	mi := &file_ingestor_v1_ingestor_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -55,7 +55,7 @@ func (x *PollWALRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PollWALRequest.ProtoReflect.Descriptor instead.
 func (*PollWALRequest) Descriptor() ([]byte, []int) {
-	return file_aggregator_v1_aggregator_proto_rawDescGZIP(), []int{0}
+	return file_ingestor_v1_ingestor_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *PollWALRequest) GetLastWalId() int64 {
@@ -75,7 +75,7 @@ type PollWALResponse struct {
 
 func (x *PollWALResponse) Reset() {
 	*x = PollWALResponse{}
-	mi := &file_aggregator_v1_aggregator_proto_msgTypes[1]
+	mi := &file_ingestor_v1_ingestor_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -87,7 +87,7 @@ func (x *PollWALResponse) String() string {
 func (*PollWALResponse) ProtoMessage() {}
 
 func (x *PollWALResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aggregator_v1_aggregator_proto_msgTypes[1]
+	mi := &file_ingestor_v1_ingestor_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -100,7 +100,7 @@ func (x *PollWALResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PollWALResponse.ProtoReflect.Descriptor instead.
 func (*PollWALResponse) Descriptor() ([]byte, []int) {
-	return file_aggregator_v1_aggregator_proto_rawDescGZIP(), []int{1}
+	return file_ingestor_v1_ingestor_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *PollWALResponse) GetWalId() int64 {
@@ -117,39 +117,39 @@ func (x *PollWALResponse) GetData() []byte {
 	return nil
 }
 
-var File_aggregator_v1_aggregator_proto protoreflect.FileDescriptor
+var File_ingestor_v1_ingestor_proto protoreflect.FileDescriptor
 
-const file_aggregator_v1_aggregator_proto_rawDesc = "" +
+const file_ingestor_v1_ingestor_proto_rawDesc = "" +
 	"\n" +
-	"\x1eaggregator/v1/aggregator.proto\x12\raggregator.v1\"0\n" +
+	"\x1aingestor/v1/ingestor.proto\x12\vingestor.v1\"0\n" +
 	"\x0ePollWALRequest\x12\x1e\n" +
 	"\vlast_wal_id\x18\x01 \x01(\x03R\tlastWalId\"<\n" +
 	"\x0fPollWALResponse\x12\x15\n" +
 	"\x06wal_id\x18\x01 \x01(\x03R\x05walId\x12\x12\n" +
-	"\x04data\x18\x02 \x01(\fR\x04data2_\n" +
-	"\x11AggregatorService\x12J\n" +
-	"\aPollWAL\x12\x1d.aggregator.v1.PollWALRequest\x1a\x1e.aggregator.v1.PollWALResponse0\x01B>Z<github.com/thisisjab/logzilla/gen/aggregator/v1;aggregatorv1b\x06proto3"
+	"\x04data\x18\x02 \x01(\fR\x04data2Y\n" +
+	"\x0fIngestorService\x12F\n" +
+	"\aPollWAL\x12\x1b.ingestor.v1.PollWALRequest\x1a\x1c.ingestor.v1.PollWALResponse0\x01B:Z8github.com/thisisjab/logzilla/gen/ingestor/v1;ingestorv1b\x06proto3"
 
 var (
-	file_aggregator_v1_aggregator_proto_rawDescOnce sync.Once
-	file_aggregator_v1_aggregator_proto_rawDescData []byte
+	file_ingestor_v1_ingestor_proto_rawDescOnce sync.Once
+	file_ingestor_v1_ingestor_proto_rawDescData []byte
 )
 
-func file_aggregator_v1_aggregator_proto_rawDescGZIP() []byte {
-	file_aggregator_v1_aggregator_proto_rawDescOnce.Do(func() {
-		file_aggregator_v1_aggregator_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_aggregator_v1_aggregator_proto_rawDesc), len(file_aggregator_v1_aggregator_proto_rawDesc)))
+func file_ingestor_v1_ingestor_proto_rawDescGZIP() []byte {
+	file_ingestor_v1_ingestor_proto_rawDescOnce.Do(func() {
+		file_ingestor_v1_ingestor_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_ingestor_v1_ingestor_proto_rawDesc), len(file_ingestor_v1_ingestor_proto_rawDesc)))
 	})
-	return file_aggregator_v1_aggregator_proto_rawDescData
+	return file_ingestor_v1_ingestor_proto_rawDescData
 }
 
-var file_aggregator_v1_aggregator_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
-var file_aggregator_v1_aggregator_proto_goTypes = []any{
-	(*PollWALRequest)(nil),  // 0: aggregator.v1.PollWALRequest
-	(*PollWALResponse)(nil), // 1: aggregator.v1.PollWALResponse
+var file_ingestor_v1_ingestor_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_ingestor_v1_ingestor_proto_goTypes = []any{
+	(*PollWALRequest)(nil),  // 0: ingestor.v1.PollWALRequest
+	(*PollWALResponse)(nil), // 1: ingestor.v1.PollWALResponse
 }
-var file_aggregator_v1_aggregator_proto_depIdxs = []int32{
-	0, // 0: aggregator.v1.AggregatorService.PollWAL:input_type -> aggregator.v1.PollWALRequest
-	1, // 1: aggregator.v1.AggregatorService.PollWAL:output_type -> aggregator.v1.PollWALResponse
+var file_ingestor_v1_ingestor_proto_depIdxs = []int32{
+	0, // 0: ingestor.v1.IngestorService.PollWAL:input_type -> ingestor.v1.PollWALRequest
+	1, // 1: ingestor.v1.IngestorService.PollWAL:output_type -> ingestor.v1.PollWALResponse
 	1, // [1:2] is the sub-list for method output_type
 	0, // [0:1] is the sub-list for method input_type
 	0, // [0:0] is the sub-list for extension type_name
@@ -157,26 +157,26 @@ var file_aggregator_v1_aggregator_proto_depIdxs = []int32{
 	0, // [0:0] is the sub-list for field type_name
 }
 
-func init() { file_aggregator_v1_aggregator_proto_init() }
-func file_aggregator_v1_aggregator_proto_init() {
-	if File_aggregator_v1_aggregator_proto != nil {
+func init() { file_ingestor_v1_ingestor_proto_init() }
+func file_ingestor_v1_ingestor_proto_init() {
+	if File_ingestor_v1_ingestor_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_aggregator_v1_aggregator_proto_rawDesc), len(file_aggregator_v1_aggregator_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_ingestor_v1_ingestor_proto_rawDesc), len(file_ingestor_v1_ingestor_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   2,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_aggregator_v1_aggregator_proto_goTypes,
-		DependencyIndexes: file_aggregator_v1_aggregator_proto_depIdxs,
-		MessageInfos:      file_aggregator_v1_aggregator_proto_msgTypes,
+		GoTypes:           file_ingestor_v1_ingestor_proto_goTypes,
+		DependencyIndexes: file_ingestor_v1_ingestor_proto_depIdxs,
+		MessageInfos:      file_ingestor_v1_ingestor_proto_msgTypes,
 	}.Build()
-	File_aggregator_v1_aggregator_proto = out.File
-	file_aggregator_v1_aggregator_proto_goTypes = nil
-	file_aggregator_v1_aggregator_proto_depIdxs = nil
+	File_ingestor_v1_ingestor_proto = out.File
+	file_ingestor_v1_ingestor_proto_goTypes = nil
+	file_ingestor_v1_ingestor_proto_depIdxs = nil
 }

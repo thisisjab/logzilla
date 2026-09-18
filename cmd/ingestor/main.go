@@ -10,7 +10,7 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/thisisjab/logzilla/aggregator"
+	"github.com/thisisjab/logzilla/ingestor"
 	"github.com/thisisjab/logzilla/shared"
 )
 
@@ -29,18 +29,18 @@ func main() {
 		collectorsPath = "collectors.yaml"
 	}
 
-	agg, err := aggregator.New(aggregator.Config{
+	ing, err := ingestor.New(ingestor.Config{
 		CollectorsPath: collectorsPath,
 		Logger:         logger,
 	})
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "cannot create aggregator: %s\n", err)
+		fmt.Fprintf(os.Stderr, "cannot create ingestor: %s\n", err)
 		os.Exit(1)
 	}
 
-	grpcServer, err := aggregator.NewGRPCServer(aggregator.GRPCServerConfig{
+	grpcServer, err := ingestor.NewGRPCServer(ingestor.GRPCServerConfig{
 		Port:   port,
-		Poller: agg,
+		Poller: ing,
 		Logger: logger,
 	})
 	if err != nil {
@@ -48,12 +48,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Separate contexts for gRPC server and Aggregator
+	// Separate contexts for gRPC server and Ingestor
 	grpcCtx, cancelGRPC := context.WithCancel(context.Background())
 	defer cancelGRPC()
 
-	aggCtx, cancelAgg := context.WithCancel(context.Background())
-	defer cancelAgg()
+	ingCtx, cancelIng := context.WithCancel(context.Background())
+	defer cancelIng()
 
 	grpcErrCh := make(chan error, 1)
 	go func() {
@@ -62,7 +62,7 @@ func main() {
 
 	ingestErrCh := make(chan error, 1)
 	go func() {
-		ingestErrCh <- agg.Ingest(aggCtx)
+		ingestErrCh <- ing.Ingest(ingCtx)
 	}()
 
 	exitChan := make(chan os.Signal, 1)
@@ -77,7 +77,7 @@ func main() {
 		}
 	case err := <-ingestErrCh:
 		if err != nil {
-			logger.Error("aggregator fatal error", "error", err)
+			logger.Error("ingestor fatal error", "error", err)
 		}
 	}
 
@@ -87,10 +87,10 @@ func main() {
 		logger.Error("gRPC server shutdown error", "error", err)
 	}
 
-	// 2. Cancel aggregator context second to stop collectors and close WAL.
-	cancelAgg()
+	// 2. Cancel ingestor context second to stop collectors and close WAL.
+	cancelIng()
 	if err := <-ingestErrCh; err != nil {
-		logger.Error("aggregator shutdown error", "error", err)
+		logger.Error("ingestor shutdown error", "error", err)
 	}
 }
 

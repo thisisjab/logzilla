@@ -1,4 +1,4 @@
-package aggregator
+package ingestor
 
 import (
 	"context"
@@ -25,32 +25,32 @@ func getFreePort(t *testing.T) int {
 
 func TestNew(t *testing.T) {
 	t.Run("returns error with nil logger", func(t *testing.T) {
-		agg, err := New(Config{
+		ing, err := New(Config{
 			Logger: nil,
 		})
 
-		assert.Nil(t, agg)
+		assert.Nil(t, ing)
 		assert.Error(t, err)
 		assert.Errorf(t, err, "logger is nil")
 	})
 
 	t.Run("returns error with empty collectors path", func(t *testing.T) {
-		agg, err := New(Config{
+		ing, err := New(Config{
 			Logger: slog.New(slog.NewJSONHandler(io.Discard, nil)),
 		})
 
-		assert.Nil(t, agg)
+		assert.Nil(t, ing)
 		assert.Error(t, err)
 		assert.Errorf(t, err, "collectors path is nil")
 	})
 
 	t.Run("returns error with invalid extension", func(t *testing.T) {
-		agg, err := New(Config{
+		ing, err := New(Config{
 			Logger:         slog.New(slog.NewJSONHandler(io.Discard, nil)),
 			CollectorsPath: "config.txt",
 		})
 
-		assert.Nil(t, agg)
+		assert.Nil(t, ing)
 		assert.Error(t, err)
 		assert.Errorf(t, err, "collectors path must end in .yaml or .yml")
 	})
@@ -61,26 +61,26 @@ func TestNew(t *testing.T) {
 
 		logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
 		path := "config.yaml"
-		agg, err := New(Config{
+		ing, err := New(Config{
 			Logger:         logger,
 			CollectorsPath: path,
 			viper:          v,
 		})
 
 		assert.NoError(t, err)
-		assert.NotNil(t, agg)
-		assert.Equal(t, logger, agg.logger)
-		assert.Equal(t, path, agg.collectorsPath)
-		assert.NotNil(t, agg.collectors)
+		assert.NotNil(t, ing)
+		assert.Equal(t, logger, ing.logger)
+		assert.Equal(t, path, ing.collectorsPath)
+		assert.NotNil(t, ing.collectors)
 	})
 }
 
-func TestAggregator_PollWAL(t *testing.T) {
+func TestIngestor_PollWAL(t *testing.T) {
 	walDir := t.TempDir()
 	v := viper.New()
 	v.Set("wal.dir", walDir)
 
-	tmpConfigFile, err := os.CreateTemp("", "agg_config_*.yaml")
+	tmpConfigFile, err := os.CreateTemp("", "ing_config_*.yaml")
 	assert.NoError(t, err)
 	defer os.Remove(tmpConfigFile.Name())
 	_, err = fmt.Fprintf(tmpConfigFile, "wal:\n  dir: %s\ncollectors: {}\n", walDir)
@@ -88,7 +88,7 @@ func TestAggregator_PollWAL(t *testing.T) {
 	tmpConfigFile.Close()
 
 	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
-	agg, err := New(Config{
+	ing, err := New(Config{
 		Logger:         logger,
 		CollectorsPath: tmpConfigFile.Name(),
 		viper:          v,
@@ -102,7 +102,7 @@ func TestAggregator_PollWAL(t *testing.T) {
 	assert.NoError(t, os.WriteFile(filepath.Join(walDir, "2000.wal"), f2Data, 0644))
 
 	// Initial poll with lastWalID = 0
-	ch := agg.PollWAL(context.Background(), 0)
+	ch := ing.PollWAL(context.Background(), 0)
 	var segs []WALSegment
 	for s := range ch {
 		assert.NoError(t, s.Err)
@@ -115,7 +115,7 @@ func TestAggregator_PollWAL(t *testing.T) {
 	assert.Equal(t, f2Data, segs[1].Data)
 
 	// Subsequent poll with lastWalID = 1000
-	ch2 := agg.PollWAL(context.Background(), 1000)
+	ch2 := ing.PollWAL(context.Background(), 1000)
 	var segs2 []WALSegment
 	for s := range ch2 {
 		assert.NoError(t, s.Err)
@@ -129,11 +129,11 @@ func TestAggregator_PollWAL(t *testing.T) {
 	assert.FileExists(t, filepath.Join(walDir, "2000.wal"))
 }
 
-func TestAggregator_Ingest(t *testing.T) {
+func TestIngestor_Ingest(t *testing.T) {
 	t.Run("invalid config initial setup returns with error", func(t *testing.T) {
 		v := viper.New()
 		v.Set("wal.dir", t.TempDir())
-		agg, err := New(Config{
+		ing, err := New(Config{
 			Logger:         slog.New(slog.NewJSONHandler(io.Discard, nil)),
 			CollectorsPath: "nonexistent.yaml",
 			viper:          v,
@@ -142,7 +142,7 @@ func TestAggregator_Ingest(t *testing.T) {
 
 		ctx := t.Context()
 
-		err = agg.Ingest(ctx)
+		err = ing.Ingest(ctx)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "cannot read config")
 	})
@@ -159,7 +159,7 @@ func TestAggregator_Ingest(t *testing.T) {
 		assert.NoError(t, err)
 		tmpFile.Close()
 
-		agg, err := New(Config{
+		ing, err := New(Config{
 			Logger:         slog.New(slog.NewJSONHandler(io.Discard, nil)),
 			CollectorsPath: tmpFile.Name(),
 			viper:          v,
@@ -168,7 +168,7 @@ func TestAggregator_Ingest(t *testing.T) {
 
 		ctx := t.Context()
 
-		err = agg.Ingest(ctx)
+		err = ing.Ingest(ctx)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to load initial config")
 	})
@@ -207,7 +207,7 @@ collectors:
 		assert.NoError(t, err)
 		tmpConfigFile.Close()
 
-		agg, err := New(Config{
+		ing, err := New(Config{
 			Logger:         slog.New(slog.NewJSONHandler(io.Discard, nil)),
 			CollectorsPath: tmpConfigFile.Name(),
 		})
@@ -217,14 +217,14 @@ collectors:
 
 		// Run Ingest in a goroutine
 		go func() {
-			_ = agg.Ingest(ctx)
+			_ = ing.Ingest(ctx)
 		}()
 
 		// Wait for c1 to be created and active
 		assert.Eventually(t, func() bool {
-			agg.collectorsMu.RLock()
-			defer agg.collectorsMu.RUnlock()
-			c, exists := agg.collectors["c1"]
+			ing.collectorsMu.RLock()
+			defer ing.collectorsMu.RUnlock()
+			c, exists := ing.collectors["c1"]
 			return exists && c.isActive
 		}, 5*time.Second, 100*time.Millisecond)
 
@@ -262,11 +262,11 @@ collectors:
 		// c2 should be active
 		// c3 should be inactive
 		assert.Eventually(t, func() bool {
-			agg.collectorsMu.RLock()
-			defer agg.collectorsMu.RUnlock()
-			_, c1Exists := agg.collectors["c1"]
-			c2, c2Exists := agg.collectors["c2"]
-			c3, c3Exists := agg.collectors["c3"]
+			ing.collectorsMu.RLock()
+			defer ing.collectorsMu.RUnlock()
+			_, c1Exists := ing.collectors["c1"]
+			c2, c2Exists := ing.collectors["c2"]
+			c3, c3Exists := ing.collectors["c3"]
 			return !c1Exists && c2Exists && c2.isActive && c3Exists && !c3.isActive
 		}, 5*time.Second, 100*time.Millisecond)
 	})
@@ -297,7 +297,7 @@ collectors:
 		assert.NoError(t, err)
 		tmpConfigFile.Close()
 
-		agg, err := New(Config{
+		ing, err := New(Config{
 			Logger:         slog.New(slog.NewJSONHandler(io.Discard, nil)),
 			CollectorsPath: tmpConfigFile.Name(),
 		})
@@ -308,14 +308,14 @@ collectors:
 		// Start Ingest
 		ingestDone := make(chan error, 1)
 		go func() {
-			ingestDone <- agg.Ingest(ctx)
+			ingestDone <- ing.Ingest(ctx)
 		}()
 
 		// Wait for collector to start
 		assert.Eventually(t, func() bool {
-			agg.collectorsMu.RLock()
-			defer agg.collectorsMu.RUnlock()
-			c, exists := agg.collectors["c1"]
+			ing.collectorsMu.RLock()
+			defer ing.collectorsMu.RUnlock()
+			c, exists := ing.collectors["c1"]
 			return exists && c.isActive
 		}, 5*time.Second, 100*time.Millisecond)
 

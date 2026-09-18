@@ -98,7 +98,7 @@ func (c *FileCollector) Collect(ctx context.Context, cb CollectorCallback) error
 						return
 					}
 
-					// Send log to aggeregator by calling the callback.
+					// Send log to ingestor by calling the callback.
 					if err := cb(c.name, strings.TrimSuffix(line, "\n")); err != nil {
 						watcherErr <- err
 						return

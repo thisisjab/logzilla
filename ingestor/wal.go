@@ -1,4 +1,4 @@
-package aggregator
+package ingestor
 
 import (
 	"encoding/binary"

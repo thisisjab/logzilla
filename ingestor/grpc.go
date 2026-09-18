@@ -1,4 +1,4 @@
-package aggregator
+package ingestor
 
 import (
 	"context"
@@ -8,25 +8,25 @@ import (
 	"net"
 	"time"
 
-	aggregatorv1 "github.com/thisisjab/logzilla/gen/aggregator/v1"
+	ingestorv1 "github.com/thisisjab/logzilla/gen/ingestor/v1"
 	"google.golang.org/grpc"
 )
 
 // WALPoller defines the interface required by the gRPC service for polling WAL data.
-// grpcServer depends ONLY on this interface, never on *Aggregator directly.
+// grpcServer depends ONLY on this interface, never on *Ingestor directly.
 type WALPoller interface {
 	PollWAL(ctx context.Context, lastWalID int64) <-chan WALSegment
 }
 
 type grpcServer struct {
-	aggregatorv1.UnimplementedAggregatorServiceServer
+	ingestorv1.UnimplementedIngestorServiceServer
 	poller WALPoller
 	logger *slog.Logger
 }
 
-// PollWAL implements [aggregatorv1.AggregatorServiceServer].
+// PollWAL implements [ingestorv1.IngestorServiceServer].
 // It receives requests and streams WAL chunks through the channel provided by WALPoller.
-func (g *grpcServer) PollWAL(req *aggregatorv1.PollWALRequest, stream grpc.ServerStreamingServer[aggregatorv1.PollWALResponse]) error {
+func (g *grpcServer) PollWAL(req *ingestorv1.PollWALRequest, stream grpc.ServerStreamingServer[ingestorv1.PollWALResponse]) error {
 	var lastWalID int64
 	if req != nil {
 		lastWalID = req.GetLastWalId()
@@ -40,7 +40,7 @@ func (g *grpcServer) PollWAL(req *aggregatorv1.PollWALRequest, stream grpc.Serve
 			return seg.Err
 		}
 
-		resp := &aggregatorv1.PollWALResponse{
+		resp := &ingestorv1.PollWALResponse{
 			WalId: seg.ID,
 			Data:  seg.Data,
 		}
@@ -52,7 +52,7 @@ func (g *grpcServer) PollWAL(req *aggregatorv1.PollWALRequest, stream grpc.Serve
 	return nil
 }
 
-// GRPCServer manages the lifecycle of the Aggregator gRPC service.
+// GRPCServer manages the lifecycle of the Ingestor gRPC service.
 type GRPCServer struct {
 	server *grpc.Server
 	lis    net.Listener
@@ -97,7 +97,7 @@ func NewGRPCServer(cfg GRPCServerConfig) (*GRPCServer, error) {
 		poller: cfg.Poller,
 		logger: cfg.Logger,
 	}
-	aggregatorv1.RegisterAggregatorServiceServer(reg, grpcSvc)
+	ingestorv1.RegisterIngestorServiceServer(reg, grpcSvc)
 
 	return &GRPCServer{
 		server: reg,
