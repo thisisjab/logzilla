@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"net"
 	"os"
 	"path/filepath"
 	"testing"
@@ -14,14 +13,6 @@ import (
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 )
-
-func getFreePort(t *testing.T) int {
-	t.Helper()
-	lis, err := net.Listen("tcp", "127.0.0.1:0")
-	assert.NoError(t, err)
-	defer lis.Close()
-	return lis.Addr().(*net.TCPAddr).Port
-}
 
 func TestNew(t *testing.T) {
 	t.Run("returns error with nil logger", func(t *testing.T) {

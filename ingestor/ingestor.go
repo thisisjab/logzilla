@@ -76,7 +76,6 @@ func New(cfg Config) (*Ingestor, error) {
 	v.SetDefault("wal.dir", "./data/wal")
 	v.SetDefault("wal.max_bytes", uint(10*1024*1024))
 	v.SetDefault("wal.sync_interval", 100*time.Millisecond)
-	v.SetDefault("grpcPort", 9393)
 
 	// Attempt reading static config (if config file exists already)
 	_ = v.ReadInConfig()
