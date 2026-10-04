@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"uuid"
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/spf13/viper"
@@ -28,6 +29,7 @@ type WALSegment struct {
 // Ingestor collects logs from collectors, stores in WALs,
 // and eventually sends WALs to the cluster node to be stored.
 type Ingestor struct {
+	uuid   uuid.UUID
 	v      *viper.Viper
 	logger *slog.Logger
 	// collectorsPath defines the yaml file that collectors and cluster nodes are read from.
@@ -50,6 +52,8 @@ type Ingestor struct {
 type Config struct {
 	CollectorsPath string
 	Logger         *slog.Logger
+	UUIDPath       string
+	UUID           uuid.UUID
 	viper          *viper.Viper
 }
 
@@ -65,6 +69,22 @@ func New(cfg Config) (*Ingestor, error) {
 	if !strings.HasSuffix(cfg.CollectorsPath, ".yml") && !strings.HasSuffix(cfg.CollectorsPath, ".yaml") {
 		return nil, errors.New("collectors path must end in .yaml or .yml")
 	}
+
+	var ingestorUUID uuid.UUID
+	if cfg.UUID != uuid.Nil() {
+		ingestorUUID = cfg.UUID
+	} else {
+		uuidPath := cfg.UUIDPath
+		if uuidPath == "" {
+			uuidPath = ".ingestor.uuid"
+		}
+		var err error
+		ingestorUUID, err = LoadOrGenerateUUID(uuidPath)
+		if err != nil {
+			return nil, fmt.Errorf("cannot load or generate ingestor uuid: %w", err)
+		}
+	}
+	cfg.Logger.Info("ingestor initialized", "uuid", ingestorUUID.String())
 
 	v := cfg.viper
 	if v == nil { // NOTE: when testing, viper is passed by the test func
@@ -90,6 +110,7 @@ func New(cfg Config) (*Ingestor, error) {
 	}
 
 	ing := &Ingestor{
+		uuid:           ingestorUUID,
 		v:              v,
 		logger:         cfg.Logger,
 		collectorsPath: cfg.CollectorsPath,
@@ -99,7 +120,7 @@ func New(cfg Config) (*Ingestor, error) {
 	}
 
 	cb := func(collectorName, data string) error {
-		err := ing.wal.Append(encodeRecord(collectorName, data))
+		err := ing.wal.Append(encodeRecord(ing.uuid, collectorName, data))
 
 		if err != nil {
 			return fmt.Errorf("cannot append to WAL: %w", err)
@@ -111,6 +132,11 @@ func New(cfg Config) (*Ingestor, error) {
 	ing.cb = cb
 
 	return ing, nil
+}
+
+// UUID returns the unique identifier assigned to this ingestor.
+func (ing *Ingestor) UUID() uuid.UUID {
+	return ing.uuid
 }
 
 // PollWAL polls unread closed WAL files and streams them through a channel.

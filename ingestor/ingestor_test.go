@@ -9,9 +9,11 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+	"uuid"
 
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNew(t *testing.T) {
@@ -46,15 +48,17 @@ func TestNew(t *testing.T) {
 		assert.Errorf(t, err, "collectors path must end in .yaml or .yml")
 	})
 
-	t.Run("success with valid config", func(t *testing.T) {
+	t.Run("success with valid config and generates uuid", func(t *testing.T) {
 		v := viper.New()
 		v.Set("wal.dir", t.TempDir())
 
+		uuidPath := filepath.Join(t.TempDir(), ".ingestor.uuid")
 		logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
 		path := "config.yaml"
 		ing, err := New(Config{
 			Logger:         logger,
 			CollectorsPath: path,
+			UUIDPath:       uuidPath,
 			viper:          v,
 		})
 
@@ -63,6 +67,29 @@ func TestNew(t *testing.T) {
 		assert.Equal(t, logger, ing.logger)
 		assert.Equal(t, path, ing.collectorsPath)
 		assert.NotNil(t, ing.collectors)
+		assert.NotEqual(t, uuid.Nil(), ing.UUID())
+
+		// File should exist with UUID
+		content, err := os.ReadFile(uuidPath)
+		assert.NoError(t, err)
+		assert.Equal(t, ing.UUID().String()+"\n", string(content))
+	})
+
+	t.Run("success with explicit UUID", func(t *testing.T) {
+		v := viper.New()
+		v.Set("wal.dir", t.TempDir())
+
+		expectedUUID := uuid.New()
+		logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
+		ing, err := New(Config{
+			Logger:         logger,
+			CollectorsPath: "config.yaml",
+			UUID:           expectedUUID,
+			viper:          v,
+		})
+
+		assert.NoError(t, err)
+		assert.Equal(t, expectedUUID, ing.UUID())
 	})
 }
 
@@ -82,6 +109,7 @@ func TestIngestor_PollWAL(t *testing.T) {
 	ing, err := New(Config{
 		Logger:         logger,
 		CollectorsPath: tmpConfigFile.Name(),
+		UUIDPath:       filepath.Join(t.TempDir(), ".ingestor.uuid"),
 		viper:          v,
 	})
 	assert.NoError(t, err)
@@ -127,6 +155,7 @@ func TestIngestor_Ingest(t *testing.T) {
 		ing, err := New(Config{
 			Logger:         slog.New(slog.NewJSONHandler(io.Discard, nil)),
 			CollectorsPath: "nonexistent.yaml",
+			UUIDPath:       filepath.Join(t.TempDir(), ".ingestor.uuid"),
 			viper:          v,
 		})
 		assert.NoError(t, err)
@@ -153,6 +182,7 @@ func TestIngestor_Ingest(t *testing.T) {
 		ing, err := New(Config{
 			Logger:         slog.New(slog.NewJSONHandler(io.Discard, nil)),
 			CollectorsPath: tmpFile.Name(),
+			UUIDPath:       filepath.Join(t.TempDir(), ".ingestor.uuid"),
 			viper:          v,
 		})
 		assert.NoError(t, err)
@@ -201,6 +231,7 @@ collectors:
 		ing, err := New(Config{
 			Logger:         slog.New(slog.NewJSONHandler(io.Discard, nil)),
 			CollectorsPath: tmpConfigFile.Name(),
+			UUIDPath:       filepath.Join(t.TempDir(), ".ingestor.uuid"),
 		})
 		assert.NoError(t, err)
 
@@ -291,6 +322,7 @@ collectors:
 		ing, err := New(Config{
 			Logger:         slog.New(slog.NewJSONHandler(io.Discard, nil)),
 			CollectorsPath: tmpConfigFile.Name(),
+			UUIDPath:       filepath.Join(t.TempDir(), ".ingestor.uuid"),
 		})
 		assert.NoError(t, err)
 
@@ -321,4 +353,40 @@ collectors:
 			t.Fatal("Ingest did not exit in time")
 		}
 	})
+}
+
+func TestIngestor_WALRecordLayout(t *testing.T) {
+	walDir := t.TempDir()
+	v := viper.New()
+	v.Set("wal.dir", walDir)
+
+	expectedUUID := uuid.New()
+	tmpConfigFile, err := os.CreateTemp("", "config_*.yaml")
+	require.NoError(t, err)
+	defer os.Remove(tmpConfigFile.Name())
+	_, err = fmt.Fprintf(tmpConfigFile, "wal:\n  dir: %s\ncollectors: {}\n", walDir)
+	require.NoError(t, err)
+	tmpConfigFile.Close()
+
+	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
+	ing, err := New(Config{
+		Logger:         logger,
+		CollectorsPath: tmpConfigFile.Name(),
+		UUID:           expectedUUID,
+		viper:          v,
+	})
+	require.NoError(t, err)
+	defer ing.wal.Close()
+
+	// Simulate collector calling callback
+	err = ing.cb("test_collector", "hello world log")
+	require.NoError(t, err)
+
+	activeFile := filepath.Join(walDir, ing.wal.ActiveFileName())
+	data, err := os.ReadFile(activeFile)
+	require.NoError(t, err)
+
+	// First 16 bytes of the WAL file record must match ingestor UUID
+	require.GreaterOrEqual(t, len(data), 16)
+	assert.Equal(t, expectedUUID[:], data[0:16])
 }

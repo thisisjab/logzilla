@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"testing"
 	"time"
+	"uuid"
 
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/assert"
@@ -49,29 +50,33 @@ func TestEncodeRecord(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rec := encodeRecord(tt.collector, tt.data)
+			ingestorID := uuid.New()
+			rec := encodeRecord(ingestorID, tt.collector, tt.data)
 
 			// Verify total size matches expected:
-			// 8 bytes (UnixMilli) + 16 bytes (ULID) + 4 bytes (collector len) + len(collector) + 4 bytes (data len) + len(data)
-			expectedSize := 8 + 16 + 4 + len(tt.collector) + 4 + len(tt.data)
+			// 16 bytes (UUID) + 8 bytes (UnixMilli) + 16 bytes (ULID) + 4 bytes (collector len) + len(collector) + 4 bytes (data len) + len(data)
+			expectedSize := 16 + 8 + 16 + 4 + len(tt.collector) + 4 + len(tt.data)
 			assert.Len(t, rec, expectedSize)
 
-			// Verify Unix Milliseconds (first 8 bytes)
-			ts := binary.BigEndian.Uint64(rec[0:8])
+			// Verify Ingestor UUID (first 16 bytes)
+			assert.Equal(t, ingestorID[:], []byte(rec[0:16]))
+
+			// Verify Unix Milliseconds (next 8 bytes: 16..24)
+			ts := binary.BigEndian.Uint64(rec[16:24])
 			assert.InDelta(t, time.Now().UnixMilli(), int64(ts), 1000)
 
-			// Verify ULID (next 16 bytes) is non-zero and valid
+			// Verify ULID (next 16 bytes: 24..40) is non-zero and valid
 			var id ulid.ULID
-			copy(id[:], rec[8:24])
+			copy(id[:], rec[24:40])
 			assert.NotEqual(t, ulid.ULID{}, id)
 
-			// Verify Collector Name Length and Collector Name bytes
-			colLen := binary.BigEndian.Uint32(rec[24:28])
+			// Verify Collector Name Length (40..44) and Collector Name bytes
+			colLen := binary.BigEndian.Uint32(rec[40:44])
 			assert.Equal(t, uint32(len(tt.collector)), colLen)
-			assert.Equal(t, []byte(tt.collector), []byte(rec[28:28+int(colLen)]))
+			assert.Equal(t, []byte(tt.collector), []byte(rec[44:44+int(colLen)]))
 
 			// Verify Log Data Length and Log Data bytes
-			dataOffset := 28 + int(colLen)
+			dataOffset := 44 + int(colLen)
 			dataLen := binary.BigEndian.Uint32(rec[dataOffset : dataOffset+4])
 			assert.Equal(t, uint32(len(tt.data)), dataLen)
 			assert.Equal(t, []byte(tt.data), []byte(rec[dataOffset+4:dataOffset+4+int(dataLen)]))

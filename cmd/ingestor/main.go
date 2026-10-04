@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"log/slog"
 	"os"
@@ -14,9 +15,16 @@ import (
 )
 
 func main() {
+	uuidPathFlag := flag.String("uuid-path", ".ingestor.uuid", "path to ingestor UUID file")
+	collectorsPathFlag := flag.String("collectors-path", "", "path to collectors yaml configuration file (overrides COLLECTORS_PATH env)")
+	flag.Parse()
+
 	logger := shared.NewLogger(readLogLevel())
 
-	collectorsPath := os.Getenv("COLLECTORS_PATH")
+	collectorsPath := *collectorsPathFlag
+	if collectorsPath == "" {
+		collectorsPath = os.Getenv("COLLECTORS_PATH")
+	}
 	if collectorsPath == "" {
 		collectorsPath = "collectors.yaml"
 	}
@@ -24,6 +32,7 @@ func main() {
 	ing, err := ingestor.New(ingestor.Config{
 		CollectorsPath: collectorsPath,
 		Logger:         logger,
+		UUIDPath:       *uuidPathFlag,
 	})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "cannot create ingestor: %s\n", err)
