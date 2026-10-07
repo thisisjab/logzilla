@@ -2,6 +2,7 @@ package ingestor
 
 import (
 	"context"
+	"time"
 
 	"github.com/thisisjab/logzilla/collector"
 )
@@ -15,9 +16,17 @@ type collectorState struct {
 	cancel context.CancelFunc
 }
 
+// walConfig defines write-ahead log settings in configuration.
+type walConfig struct {
+	Dir          string        `mapstructure:"dir"`
+	MaxBytes     uint          `mapstructure:"max_bytes"`
+	SyncInterval time.Duration `mapstructure:"sync_interval"`
+}
+
 // viperConfig is the struct that is expected from config file.
 type viperConfig struct {
-	GRPCPort   int `mapstructure:"grpcPort"`
+	GRPCPort   int       `mapstructure:"grpcPort"`
+	WAL        walConfig `mapstructure:"wal"`
 	Collectors map[string]struct {
 		Type     string         `mapstructure:"type"`
 		IsActive *bool          `mapstructure:"isActive"`
@@ -43,6 +52,7 @@ func (ing *Ingestor) updateConfig(ctx context.Context, newConfig viperConfig) {
 	// Any config file change currently rebuilds and restarts all collectors.
 	// A future version should diff the old and new configs and only restart
 	// collectors whose configuration actually changed.
+	// WAL settings (dir, max_bytes, sync_interval) are skipped from hot reload.
 
 	ing.collectorsMu.Lock()
 	defer ing.collectorsMu.Unlock()

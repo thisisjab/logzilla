@@ -92,7 +92,6 @@ func New(cfg Config) (*Ingestor, error) {
 	}
 
 	v.SetConfigFile(cfg.CollectorsPath)
-	// TODO: add these configs to hot reload config struct as well
 	v.SetDefault("wal.dir", "./data/wal")
 	v.SetDefault("wal.max_bytes", uint(10*1024*1024))
 	v.SetDefault("wal.sync_interval", 100*time.Millisecond)
