@@ -19,101 +19,101 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	AggregatorService_SendWAL_FullMethodName = "/aggregator.v1.AggregatorService/SendWAL"
+	Aggregator_AppendWAL_FullMethodName = "/aggregator.v1.Aggregator/AppendWAL"
 )
 
-// AggregatorServiceClient is the client API for AggregatorService service.
+// AggregatorClient is the client API for Aggregator service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
-type AggregatorServiceClient interface {
-	SendWAL(ctx context.Context, in *SendWALRequest, opts ...grpc.CallOption) (*SendWALResponse, error)
+type AggregatorClient interface {
+	AppendWAL(ctx context.Context, in *AppendWALRequest, opts ...grpc.CallOption) (*AppendWALResponse, error)
 }
 
-type aggregatorServiceClient struct {
+type aggregatorClient struct {
 	cc grpc.ClientConnInterface
 }
 
-func NewAggregatorServiceClient(cc grpc.ClientConnInterface) AggregatorServiceClient {
-	return &aggregatorServiceClient{cc}
+func NewAggregatorClient(cc grpc.ClientConnInterface) AggregatorClient {
+	return &aggregatorClient{cc}
 }
 
-func (c *aggregatorServiceClient) SendWAL(ctx context.Context, in *SendWALRequest, opts ...grpc.CallOption) (*SendWALResponse, error) {
+func (c *aggregatorClient) AppendWAL(ctx context.Context, in *AppendWALRequest, opts ...grpc.CallOption) (*AppendWALResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(SendWALResponse)
-	err := c.cc.Invoke(ctx, AggregatorService_SendWAL_FullMethodName, in, out, cOpts...)
+	out := new(AppendWALResponse)
+	err := c.cc.Invoke(ctx, Aggregator_AppendWAL_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-// AggregatorServiceServer is the server API for AggregatorService service.
-// All implementations must embed UnimplementedAggregatorServiceServer
+// AggregatorServer is the server API for Aggregator service.
+// All implementations must embed UnimplementedAggregatorServer
 // for forward compatibility.
-type AggregatorServiceServer interface {
-	SendWAL(context.Context, *SendWALRequest) (*SendWALResponse, error)
-	mustEmbedUnimplementedAggregatorServiceServer()
+type AggregatorServer interface {
+	AppendWAL(context.Context, *AppendWALRequest) (*AppendWALResponse, error)
+	mustEmbedUnimplementedAggregatorServer()
 }
 
-// UnimplementedAggregatorServiceServer must be embedded to have
+// UnimplementedAggregatorServer must be embedded to have
 // forward compatible implementations.
 //
 // NOTE: this should be embedded by value instead of pointer to avoid a nil
 // pointer dereference when methods are called.
-type UnimplementedAggregatorServiceServer struct{}
+type UnimplementedAggregatorServer struct{}
 
-func (UnimplementedAggregatorServiceServer) SendWAL(context.Context, *SendWALRequest) (*SendWALResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method SendWAL not implemented")
+func (UnimplementedAggregatorServer) AppendWAL(context.Context, *AppendWALRequest) (*AppendWALResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method AppendWAL not implemented")
 }
-func (UnimplementedAggregatorServiceServer) mustEmbedUnimplementedAggregatorServiceServer() {}
-func (UnimplementedAggregatorServiceServer) testEmbeddedByValue()                           {}
+func (UnimplementedAggregatorServer) mustEmbedUnimplementedAggregatorServer() {}
+func (UnimplementedAggregatorServer) testEmbeddedByValue()                    {}
 
-// UnsafeAggregatorServiceServer may be embedded to opt out of forward compatibility for this service.
-// Use of this interface is not recommended, as added methods to AggregatorServiceServer will
+// UnsafeAggregatorServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to AggregatorServer will
 // result in compilation errors.
-type UnsafeAggregatorServiceServer interface {
-	mustEmbedUnimplementedAggregatorServiceServer()
+type UnsafeAggregatorServer interface {
+	mustEmbedUnimplementedAggregatorServer()
 }
 
-func RegisterAggregatorServiceServer(s grpc.ServiceRegistrar, srv AggregatorServiceServer) {
-	// If the following call panics, it indicates UnimplementedAggregatorServiceServer was
+func RegisterAggregatorServer(s grpc.ServiceRegistrar, srv AggregatorServer) {
+	// If the following call panics, it indicates UnimplementedAggregatorServer was
 	// embedded by pointer and is nil.  This will cause panics if an
 	// unimplemented method is ever invoked, so we test this at initialization
 	// time to prevent it from happening at runtime later due to I/O.
 	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
 		t.testEmbeddedByValue()
 	}
-	s.RegisterService(&AggregatorService_ServiceDesc, srv)
+	s.RegisterService(&Aggregator_ServiceDesc, srv)
 }
 
-func _AggregatorService_SendWAL_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(SendWALRequest)
+func _Aggregator_AppendWAL_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AppendWALRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(AggregatorServiceServer).SendWAL(ctx, in)
+		return srv.(AggregatorServer).AppendWAL(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: AggregatorService_SendWAL_FullMethodName,
+		FullMethod: Aggregator_AppendWAL_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AggregatorServiceServer).SendWAL(ctx, req.(*SendWALRequest))
+		return srv.(AggregatorServer).AppendWAL(ctx, req.(*AppendWALRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-// AggregatorService_ServiceDesc is the grpc.ServiceDesc for AggregatorService service.
+// Aggregator_ServiceDesc is the grpc.ServiceDesc for Aggregator service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
-var AggregatorService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "aggregator.v1.AggregatorService",
-	HandlerType: (*AggregatorServiceServer)(nil),
+var Aggregator_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "aggregator.v1.Aggregator",
+	HandlerType: (*AggregatorServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "SendWAL",
-			Handler:    _AggregatorService_SendWAL_Handler,
+			MethodName: "AppendWAL",
+			Handler:    _Aggregator_AppendWAL_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

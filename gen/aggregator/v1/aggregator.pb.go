@@ -21,7 +21,7 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-type SendWALRequest struct {
+type AppendWALRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	WalId         int64                  `protobuf:"varint,1,opt,name=wal_id,json=walId,proto3" json:"wal_id,omitempty"`
 	Data          []byte                 `protobuf:"bytes,2,opt,name=data,proto3" json:"data,omitempty"`
@@ -29,20 +29,20 @@ type SendWALRequest struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *SendWALRequest) Reset() {
-	*x = SendWALRequest{}
+func (x *AppendWALRequest) Reset() {
+	*x = AppendWALRequest{}
 	mi := &file_aggregator_v1_aggregator_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *SendWALRequest) String() string {
+func (x *AppendWALRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*SendWALRequest) ProtoMessage() {}
+func (*AppendWALRequest) ProtoMessage() {}
 
-func (x *SendWALRequest) ProtoReflect() protoreflect.Message {
+func (x *AppendWALRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_aggregator_v1_aggregator_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -54,47 +54,45 @@ func (x *SendWALRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use SendWALRequest.ProtoReflect.Descriptor instead.
-func (*SendWALRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use AppendWALRequest.ProtoReflect.Descriptor instead.
+func (*AppendWALRequest) Descriptor() ([]byte, []int) {
 	return file_aggregator_v1_aggregator_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *SendWALRequest) GetWalId() int64 {
+func (x *AppendWALRequest) GetWalId() int64 {
 	if x != nil {
 		return x.WalId
 	}
 	return 0
 }
 
-func (x *SendWALRequest) GetData() []byte {
+func (x *AppendWALRequest) GetData() []byte {
 	if x != nil {
 		return x.Data
 	}
 	return nil
 }
 
-type SendWALResponse struct {
+type AppendWALResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
-	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *SendWALResponse) Reset() {
-	*x = SendWALResponse{}
+func (x *AppendWALResponse) Reset() {
+	*x = AppendWALResponse{}
 	mi := &file_aggregator_v1_aggregator_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *SendWALResponse) String() string {
+func (x *AppendWALResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*SendWALResponse) ProtoMessage() {}
+func (*AppendWALResponse) ProtoMessage() {}
 
-func (x *SendWALResponse) ProtoReflect() protoreflect.Message {
+func (x *AppendWALResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_aggregator_v1_aggregator_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -106,38 +104,23 @@ func (x *SendWALResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use SendWALResponse.ProtoReflect.Descriptor instead.
-func (*SendWALResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use AppendWALResponse.ProtoReflect.Descriptor instead.
+func (*AppendWALResponse) Descriptor() ([]byte, []int) {
 	return file_aggregator_v1_aggregator_proto_rawDescGZIP(), []int{1}
-}
-
-func (x *SendWALResponse) GetSuccess() bool {
-	if x != nil {
-		return x.Success
-	}
-	return false
-}
-
-func (x *SendWALResponse) GetMessage() string {
-	if x != nil {
-		return x.Message
-	}
-	return ""
 }
 
 var File_aggregator_v1_aggregator_proto protoreflect.FileDescriptor
 
 const file_aggregator_v1_aggregator_proto_rawDesc = "" +
 	"\n" +
-	"\x1eaggregator/v1/aggregator.proto\x12\raggregator.v1\";\n" +
-	"\x0eSendWALRequest\x12\x15\n" +
+	"\x1eaggregator/v1/aggregator.proto\x12\raggregator.v1\"=\n" +
+	"\x10AppendWALRequest\x12\x15\n" +
 	"\x06wal_id\x18\x01 \x01(\x03R\x05walId\x12\x12\n" +
-	"\x04data\x18\x02 \x01(\fR\x04data\"E\n" +
-	"\x0fSendWALResponse\x12\x18\n" +
-	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage2]\n" +
-	"\x11AggregatorService\x12H\n" +
-	"\aSendWAL\x12\x1d.aggregator.v1.SendWALRequest\x1a\x1e.aggregator.v1.SendWALResponseB>Z<github.com/thisisjab/logzilla/gen/aggregator/v1;aggregatorv1b\x06proto3"
+	"\x04data\x18\x02 \x01(\fR\x04data\"\x13\n" +
+	"\x11AppendWALResponse2\\\n" +
+	"\n" +
+	"Aggregator\x12N\n" +
+	"\tAppendWAL\x12\x1f.aggregator.v1.AppendWALRequest\x1a .aggregator.v1.AppendWALResponseB>Z<github.com/thisisjab/logzilla/gen/aggregator/v1;aggregatorv1b\x06proto3"
 
 var (
 	file_aggregator_v1_aggregator_proto_rawDescOnce sync.Once
@@ -153,12 +136,12 @@ func file_aggregator_v1_aggregator_proto_rawDescGZIP() []byte {
 
 var file_aggregator_v1_aggregator_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
 var file_aggregator_v1_aggregator_proto_goTypes = []any{
-	(*SendWALRequest)(nil),  // 0: aggregator.v1.SendWALRequest
-	(*SendWALResponse)(nil), // 1: aggregator.v1.SendWALResponse
+	(*AppendWALRequest)(nil),  // 0: aggregator.v1.AppendWALRequest
+	(*AppendWALResponse)(nil), // 1: aggregator.v1.AppendWALResponse
 }
 var file_aggregator_v1_aggregator_proto_depIdxs = []int32{
-	0, // 0: aggregator.v1.AggregatorService.SendWAL:input_type -> aggregator.v1.SendWALRequest
-	1, // 1: aggregator.v1.AggregatorService.SendWAL:output_type -> aggregator.v1.SendWALResponse
+	0, // 0: aggregator.v1.Aggregator.AppendWAL:input_type -> aggregator.v1.AppendWALRequest
+	1, // 1: aggregator.v1.Aggregator.AppendWAL:output_type -> aggregator.v1.AppendWALResponse
 	1, // [1:2] is the sub-list for method output_type
 	0, // [0:1] is the sub-list for method input_type
 	0, // [0:0] is the sub-list for extension type_name

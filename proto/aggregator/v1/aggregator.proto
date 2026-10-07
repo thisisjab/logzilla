@@ -4,16 +4,13 @@ package aggregator.v1;
 
 option go_package = "github.com/thisisjab/logzilla/gen/aggregator/v1;aggregatorv1";
 
-service AggregatorService {
-  rpc SendWAL(SendWALRequest) returns (SendWALResponse);
+service Aggregator {
+  rpc AppendWAL(AppendWALRequest) returns (AppendWALResponse);
 }
 
-message SendWALRequest {
+message AppendWALRequest {
   int64 wal_id = 1;
   bytes data = 2;
 }
 
-message SendWALResponse {
-  bool success = 1;
-  string message = 2;
-}
+message AppendWALResponse {}
