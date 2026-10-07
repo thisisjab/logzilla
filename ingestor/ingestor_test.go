@@ -437,3 +437,48 @@ func TestLoadConfig_WALConfig(t *testing.T) {
 		assert.Equal(t, 250*time.Millisecond, cfg.WAL.SyncInterval)
 	})
 }
+
+func TestLoadConfig_PushConfig(t *testing.T) {
+	t.Run("defaults when push section is omitted", func(t *testing.T) {
+		walDir := t.TempDir()
+		v := viper.New()
+		v.Set("wal.dir", walDir)
+
+		configFile := filepath.Join(t.TempDir(), "config.yaml")
+		require.NoError(t, os.WriteFile(configFile, []byte("collectors: {}\n"), 0644))
+
+		ing, err := New(Config{
+			Logger:         slog.New(slog.NewJSONHandler(io.Discard, nil)),
+			CollectorsPath: configFile,
+			UUIDPath:       filepath.Join(t.TempDir(), ".ingestor.uuid"),
+			viper:          v,
+		})
+		require.NoError(t, err)
+		defer ing.wal.Close()
+
+		var cfg viperConfig
+		require.NoError(t, ing.v.Unmarshal(&cfg))
+		assert.Empty(t, cfg.Push.Server)
+		assert.Equal(t, 30*time.Second, cfg.Push.Interval)
+	})
+
+	t.Run("custom push configuration parsed correctly", func(t *testing.T) {
+		walDir := t.TempDir()
+		configFile := filepath.Join(t.TempDir(), "config.yaml")
+		content := fmt.Sprintf("wal:\n  dir: %s\npush:\n  server: 192.168.1.100:50051\n  interval: 15s\ncollectors: {}\n", walDir)
+		require.NoError(t, os.WriteFile(configFile, []byte(content), 0644))
+
+		ing, err := New(Config{
+			Logger:         slog.New(slog.NewJSONHandler(io.Discard, nil)),
+			CollectorsPath: configFile,
+			UUIDPath:       filepath.Join(t.TempDir(), ".ingestor.uuid"),
+		})
+		require.NoError(t, err)
+		defer ing.wal.Close()
+
+		var cfg viperConfig
+		require.NoError(t, ing.v.Unmarshal(&cfg))
+		assert.Equal(t, "192.168.1.100:50051", cfg.Push.Server)
+		assert.Equal(t, 15*time.Second, cfg.Push.Interval)
+	})
+}

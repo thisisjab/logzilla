@@ -45,6 +45,8 @@ type Ingestor struct {
 	collectors map[string]*collectorState
 	// wal handles persisting logs to disk.
 	wal *wal.WAL
+	// pusher handles shipping closed WAL files to the aggregator.
+	pusher *Pusher
 	// cb is the callback function for getting ingested logs from collectors.
 	cb func(collectorName, data string) error
 }
@@ -95,6 +97,8 @@ func New(cfg Config) (*Ingestor, error) {
 	v.SetDefault("wal.dir", "./data/wal")
 	v.SetDefault("wal.max_bytes", uint(10*1024*1024))
 	v.SetDefault("wal.sync_interval", 100*time.Millisecond)
+	v.SetDefault("push.server", "")
+	v.SetDefault("push.interval", 30*time.Second)
 
 	// Attempt reading static config (if config file exists already)
 	_ = v.ReadInConfig()
@@ -108,6 +112,10 @@ func New(cfg Config) (*Ingestor, error) {
 		return nil, fmt.Errorf("cannot create WAL: %w", err)
 	}
 
+	pushServer := v.GetString("push.server")
+	pushInterval := v.GetDuration("push.interval")
+	p := NewPusher(pushServer, pushInterval, w, cfg.Logger)
+
 	ing := &Ingestor{
 		uuid:           ingestorUUID,
 		v:              v,
@@ -116,6 +124,7 @@ func New(cfg Config) (*Ingestor, error) {
 
 		collectors: make(map[string]*collectorState),
 		wal:        w,
+		pusher:     p,
 	}
 
 	cb := func(collectorName, data string) error {
@@ -254,10 +263,17 @@ func (ing *Ingestor) Ingest(ctx context.Context) error {
 		}
 		ing.collectorsMu.Unlock()
 		ing.collectorWg.Wait()
+		if ing.pusher != nil {
+			_ = ing.pusher.Close()
+		}
 		if ing.wal != nil {
 			ing.wal.Close()
 		}
 	}()
+
+	if ing.pusher != nil {
+		go ing.pusher.Run(ctx)
+	}
 
 	ing.v.SetConfigFile(ing.collectorsPath)
 

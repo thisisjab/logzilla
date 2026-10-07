@@ -23,10 +23,17 @@ type walConfig struct {
 	SyncInterval time.Duration `mapstructure:"sync_interval"`
 }
 
+// pushConfig defines aggregator WAL pushing settings.
+type pushConfig struct {
+	Server   string        `mapstructure:"server"`
+	Interval time.Duration `mapstructure:"interval"`
+}
+
 // viperConfig is the struct that is expected from config file.
 type viperConfig struct {
-	GRPCPort   int       `mapstructure:"grpcPort"`
-	WAL        walConfig `mapstructure:"wal"`
+	GRPCPort   int        `mapstructure:"grpcPort"`
+	WAL        walConfig  `mapstructure:"wal"`
+	Push       pushConfig `mapstructure:"push"`
 	Collectors map[string]struct {
 		Type     string         `mapstructure:"type"`
 		IsActive *bool          `mapstructure:"isActive"`
@@ -53,6 +60,10 @@ func (ing *Ingestor) updateConfig(ctx context.Context, newConfig viperConfig) {
 	// A future version should diff the old and new configs and only restart
 	// collectors whose configuration actually changed.
 	// WAL settings (dir, max_bytes, sync_interval) are skipped from hot reload.
+
+	if ing.pusher != nil {
+		ing.pusher.UpdateConfig(newConfig.Push.Server, newConfig.Push.Interval)
+	}
 
 	ing.collectorsMu.Lock()
 	defer ing.collectorsMu.Unlock()
