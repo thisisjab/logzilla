@@ -1,6 +1,7 @@
 package entity_test
 
 import (
+	"errors"
 	"testing"
 	"time"
 	"uuid"
@@ -48,6 +49,12 @@ func TestNewLogRecord(t *testing.T) {
 		if rec.Metadata["user_id"] != 42 {
 			t.Errorf("Metadata[user_id] = %v, want 42", rec.Metadata["user_id"])
 		}
+		if rec.HasError() {
+			t.Errorf("HasError() = true, want false")
+		}
+		if rec.Err() != nil {
+			t.Errorf("Err() = %v, want nil", rec.Err())
+		}
 	})
 
 	t.Run("nil metadata initializes empty map", func(t *testing.T) {
@@ -91,6 +98,34 @@ func TestNewLogRecord(t *testing.T) {
 		}
 		if rec.DateTime().IsZero() {
 			t.Error("DateTime() is zero, want non-zero UTC time")
+		}
+	})
+
+	t.Run("error attachment and inspection", func(t *testing.T) {
+		rec := entity.New(
+			recordID,
+			nodeID,
+			"node-3",
+			"syslog",
+			1760000000000,
+			entity.LevelUnknown,
+			"",
+			nil,
+			"raw crash log",
+		)
+
+		if rec.HasError() {
+			t.Errorf("initially HasError() = true, want false")
+		}
+
+		testErr := errors.New("lua runtime script error")
+		recWithError := rec.WithError(testErr)
+
+		if !recWithError.HasError() {
+			t.Errorf("after WithError, HasError() = false, want true")
+		}
+		if !errors.Is(recWithError.Err(), testErr) {
+			t.Errorf("Err() = %v, want %v", recWithError.Err(), testErr)
 		}
 	})
 }

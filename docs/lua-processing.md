@@ -151,3 +151,13 @@ function process(raw, collector, node_id, timestamp)
     }
 end
 ```
+
+---
+
+## 6. Error Handling & Fallback Behavior
+
+Processing failures do not halt the ingestion pipeline or cause log lines to be lost:
+
+- **Script Runtime Crashes**: If a Lua script encounters an unhandled runtime error (e.g. `nil` indexing or explicit `error()`), the processor captures the error and returns a fallback `LogRecord` preserving the raw log payload (`Raw`), arrival timestamp (`Timestamp`), ingestor node (`NodeID`), and collector (`CollectorName`), with `LevelUnknown`.
+- **Datetime Parse Failures**: If the script returns a string timestamp that cannot be parsed using `DATETIME_FORMAT`, the record's `Timestamp` is set to `0` (Unix epoch start: `1970-01-01 00:00:00 UTC`), making the faulty log line immediately identifiable in range queries.
+- **Error Inspection**: Errored records store the underlying Go error accessible via `record.Err() error` and can be checked with `record.HasError() bool`. Upstream components and query engines can inspect or filter these records without discarding unparsed log lines.

@@ -19,11 +19,28 @@ type LogRecord struct {
 	Message       string
 	Metadata      map[string]any
 	Raw           string
+	err           error
 }
 
 // DateTime returns the UTC time.Time representation of the log record's millisecond timestamp.
 func (r LogRecord) DateTime() time.Time {
 	return time.UnixMilli(r.Timestamp).UTC()
+}
+
+// Err returns the processing error encountered for this record, or nil if processing succeeded.
+func (r LogRecord) Err() error {
+	return r.err
+}
+
+// HasError reports whether the log record encountered a processing error.
+func (r LogRecord) HasError() bool {
+	return r.err != nil
+}
+
+// WithError returns a copy of the LogRecord with the given processing error attached.
+func (r LogRecord) WithError(err error) LogRecord {
+	r.err = err
+	return r
 }
 
 // New creates a new LogRecord with normalized timestamp and metadata.
