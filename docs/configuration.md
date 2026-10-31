@@ -44,7 +44,7 @@ push:
 
 ## 2. Aggregator Configuration (`aggregator.yaml`)
 
-The aggregator reads network listening settings and storage locations from `aggregator.yaml`.
+The aggregator reads network listening settings, storage locations, and pre-processing pipeline configurations from `aggregator.yaml`.
 
 ```yaml
 # gRPC Network Settings
@@ -54,7 +54,37 @@ grpc:
 # Storage Settings
 wal:
   dir: "./data/aggregator/wal"   # Directory where received WAL segments are stored
+
+# Pre-Processing Pipeline
+processors:
+  - name: capitalizor
+    script: |
+      function process(raw, collector, node_id, timestamp)
+          return { level = "info", message = string.upper(raw) }
+      end
+    collectors:
+      - "postgres-db"
+      - "server-*-logs"
+
+  - name: json-parser
+    script_path: "/etc/logzilla/processors/json.lua"
+    collectors: "*.json"
+
+  - name: fallback
+    script_path: "/etc/logzilla/processors/fallback.lua"
+    collectors: "*"
 ```
+
+### Processor Collector Matching Rules
+- Each incoming log record is routed to at most one processor based on its collector name.
+- **Precedence Order**:
+  1. Exact match (e.g. `postgres-db`, `journalctl`)
+  2. Partial glob match evaluated in configuration order (first match wins). Supported syntax via Go standard [`filepath.Match`](https://pkg.go.dev/path/filepath#Match):
+     - `*`: matches any sequence of characters (e.g. `server-*-logs`, `*.json`)
+     - `?`: matches any single character (e.g. `node-?`)
+     - `[...]`: matches character ranges or sets (e.g. `app-[0-9]`, `service-[a-c]`)
+  3. Catch-all wildcard (`*`)
+- If a collector matches no configured processor, its records are safely ignored without error.
 
 ### Aggregator CLI Flags & Environment Variables
 

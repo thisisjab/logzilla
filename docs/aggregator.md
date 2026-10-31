@@ -61,7 +61,62 @@ To ensure zero corrupted or half-written WAL segments in the event of an abrupt 
 
 ---
 
-## 3. Server Architecture & Graceful Shutdown
+## 3. Background Pipeline Worker & Processing
+
+The Aggregator runs an asynchronous background worker that discovers closed WAL segments on disk and streams them through sandboxed pre-processors:
+
+```
+                      +-----------------------------+
+                      | Incoming AppendWAL Request  |
+                      +--------------+--------------+
+                                     |
+                                     v
+                  +---------------------------------------+
+                  | Write to <wal_id>.wal.tmp-<pid> file  |
+                  +-------------------+-------------------+
+                                     |
+                                     v
+                  +---------------------------------------+
+                  | Atomic os.Rename(tmp, <wal_id>.wal)   |
+                  +-------------------+-------------------+
+                                     |
+                                     v
+                  +---------------------------------------+
+                  | Return AppendWALResponse (Success)    |
+                  +---------------------------------------+
+
+
+   [Background Worker: Periodic Ticker (aggregator/worker.go)]
+                                 |
+                                 v
+              +-------------------------------------+
+              | Scan walDir for id > lastWalID      |
+              +------------------+------------------+
+                                 |
+                                 v
+              +-------------------------------------+
+              | Stream records via Iterator         |
+              +------------------+------------------+
+                                 |
+                                 v
+              +-------------------------------------+
+              | Route to LuaProcessor               |
+              | (exact > partial glob > *)          |
+              +-------------------------------------+
+```
+
+### Worker Behavior
+1. **Periodic Discovery**: The worker periodically scans `walDir` (every 500ms), discovering closed files matching `<id>.wal` where `id > lastProcessedWalID`.
+2. **Sequential Ordering**: Candidates are sorted ascending by timestamp ID to preserve strict chronological replay.
+3. **Collector Routing**: Uses `processor.Router` to resolve the matching processor for `record.CollectorName`:
+   - Exact match (e.g. `postgres-db`)
+   - Partial glob match evaluated in configuration order (first match wins) supporting Go `filepath.Match` wildcards (`*`, `?`, `[...]`)
+   - Catch-all (`*`)
+4. **Cursor Advancement**: On completing a segment, the in-memory cursor `lastProcessedWalID` (`atomic.Int64`) is updated to prevent duplicate execution during the service lifecycle.
+
+---
+
+## 4. Server Architecture & Graceful Shutdown
 
 ```go
 type Aggregator struct {
@@ -72,16 +127,19 @@ type Aggregator struct {
     configPath string
     walDir     string
     port       int
+    router     *processor.Router
 
-    mu         sync.Mutex
-    grpcServer *grpc.Server
-    listener   net.Listener
+    mu                 sync.Mutex
+    grpcServer         *grpc.Server
+    listener           net.Listener
+    lastProcessedWalID atomic.Int64
+    workerWg           sync.WaitGroup
 }
 ```
 
 ### Shutdown Handling
-- `agg.Serve(ctx)` listens on the configured TCP port (`grpc.port`, default `50051`).
-- When the parent `ctx` is canceled (e.g. `SIGINT`/`SIGTERM`), `grpcServer.GracefulStop()` is invoked:
-  - Halts acceptance of new incoming connections.
-  - Allows in-flight `AppendWAL` RPCs to flush and finish cleanly.
+- `agg.Serve(ctx)` listens on the configured TCP port (`grpc.port`, default `50051`) and launches the background worker goroutine.
+- When the parent `ctx` is canceled (e.g. `SIGINT`/`SIGTERM`):
+  - `grpcServer.GracefulStop()` stops accepting new RPCs and lets in-flight writes finish.
+  - Background worker context is canceled and `a.workerWg.Wait()` ensures in-flight segment decoding finishes cleanly.
   - Returns `context.Canceled` or clean termination.

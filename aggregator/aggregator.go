@@ -10,9 +10,11 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/spf13/viper"
 	aggregatorv1 "github.com/thisisjab/logzilla/gen/aggregator/v1"
+	"github.com/thisisjab/logzilla/processor"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -23,10 +25,12 @@ type Config struct {
 	Logger     *slog.Logger
 	Port       int
 	WALDir     string
+	Router     *processor.Router
 	viper      *viper.Viper
 }
 
-// Aggregator collects WAL files from ingestors and stores them on disk.
+// Aggregator collects WAL files from ingestors, stores them on disk,
+// and decodes them through pre-processors in a background worker.
 type Aggregator struct {
 	aggregatorv1.UnimplementedAggregatorServer
 
@@ -35,10 +39,13 @@ type Aggregator struct {
 	configPath string
 	walDir     string
 	port       int
+	router     *processor.Router
 
-	mu         sync.Mutex
-	grpcServer *grpc.Server
-	listener   net.Listener
+	mu                 sync.Mutex
+	grpcServer         *grpc.Server
+	listener           net.Listener
+	lastProcessedWalID atomic.Int64
+	workerWg           sync.WaitGroup
 }
 
 func New(cfg Config) (*Aggregator, error) {
@@ -76,12 +83,22 @@ func New(cfg Config) (*Aggregator, error) {
 		return nil, fmt.Errorf("cannot create WAL directory: %w", err)
 	}
 
+	router := cfg.Router
+	if router == nil {
+		var err error
+		router, err = buildRouterFromViper(v)
+		if err != nil {
+			return nil, fmt.Errorf("cannot configure processors: %w", err)
+		}
+	}
+
 	return &Aggregator{
 		v:          v,
 		logger:     cfg.Logger,
 		configPath: cfg.ConfigPath,
 		walDir:     walDir,
 		port:       port,
+		router:     router,
 	}, nil
 }
 
@@ -110,6 +127,16 @@ func (a *Aggregator) Addr() string {
 		return a.listener.Addr().String()
 	}
 	return fmt.Sprintf(":%d", a.port)
+}
+
+// Router returns the active processor router.
+func (a *Aggregator) Router() *processor.Router {
+	return a.router
+}
+
+// LastProcessedWalID returns the highest WAL ID processed by the background worker.
+func (a *Aggregator) LastProcessedWalID() int64 {
+	return a.lastProcessedWalID.Load()
 }
 
 // AppendWAL handles incoming WAL segments from ingestors.
@@ -153,7 +180,7 @@ func (a *Aggregator) AppendWAL(ctx context.Context, req *aggregatorv1.AppendWALR
 	return &aggregatorv1.AppendWALResponse{}, nil
 }
 
-// Serve starts the gRPC server and blocks until ctx is canceled or an error occurs.
+// Serve starts the gRPC server and background processing worker, blocking until ctx is canceled or an error occurs.
 func (a *Aggregator) Serve(ctx context.Context) error {
 	addr := fmt.Sprintf(":%d", a.port)
 	lis, err := net.Listen("tcp", addr)
@@ -171,6 +198,16 @@ func (a *Aggregator) Serve(ctx context.Context) error {
 
 	a.logger.Info("aggregator gRPC server listening", "addr", lis.Addr().String(), "wal_dir", a.walDir)
 
+	// Launch background WAL pipeline worker
+	workerCtx, workerCancel := context.WithCancel(ctx)
+	defer workerCancel()
+
+	a.workerWg.Add(1)
+	go func() {
+		defer a.workerWg.Done()
+		a.runWorker(workerCtx)
+	}()
+
 	errCh := make(chan error, 1)
 	go func() {
 		if err := grpcServer.Serve(lis); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
@@ -183,8 +220,13 @@ func (a *Aggregator) Serve(ctx context.Context) error {
 	case <-ctx.Done():
 		a.logger.Info("stopping aggregator gRPC server")
 		grpcServer.GracefulStop()
+		workerCancel()
+		a.workerWg.Wait()
 		return ctx.Err()
 	case err := <-errCh:
+		grpcServer.GracefulStop()
+		workerCancel()
+		a.workerWg.Wait()
 		return err
 	}
 }
