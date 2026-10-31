@@ -62,8 +62,15 @@ func (a *Aggregator) processWALFile(filePath string, walID int64) error {
 	for it.Next() {
 		record := it.Record()
 		if a.router != nil {
-			if _, err := a.router.Process(record); err != nil {
+			processed, err := a.router.Process(record)
+			if err != nil {
 				a.logger.Error("error processing record in pipeline", "collector", record.CollectorName, "error", err)
+				continue
+			}
+			if processed != nil && a.storage != nil {
+				if err := a.storage.Put(*processed); err != nil {
+					a.logger.Error("error storing record in memtable", "error", err)
+				}
 			}
 		}
 	}

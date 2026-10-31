@@ -15,6 +15,7 @@ import (
 	"github.com/spf13/viper"
 	aggregatorv1 "github.com/thisisjab/logzilla/gen/aggregator/v1"
 	"github.com/thisisjab/logzilla/processor"
+	"github.com/thisisjab/logzilla/storage"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -26,6 +27,7 @@ type Config struct {
 	Port       int
 	WALDir     string
 	Router     *processor.Router
+	Storage    *storage.Storage
 	viper      *viper.Viper
 }
 
@@ -40,6 +42,7 @@ type Aggregator struct {
 	walDir     string
 	port       int
 	router     *processor.Router
+	storage    *storage.Storage
 
 	mu                 sync.Mutex
 	grpcServer         *grpc.Server
@@ -92,6 +95,11 @@ func New(cfg Config) (*Aggregator, error) {
 		}
 	}
 
+	storageEngine := cfg.Storage
+	if storageEngine == nil {
+		storageEngine = storage.NewStorage(storage.DefaultMaxMemTableBytes)
+	}
+
 	return &Aggregator{
 		v:          v,
 		logger:     cfg.Logger,
@@ -99,6 +107,7 @@ func New(cfg Config) (*Aggregator, error) {
 		walDir:     walDir,
 		port:       port,
 		router:     router,
+		storage:    storageEngine,
 	}, nil
 }
 
@@ -132,6 +141,11 @@ func (a *Aggregator) Addr() string {
 // Router returns the active processor router.
 func (a *Aggregator) Router() *processor.Router {
 	return a.router
+}
+
+// Storage returns the storage engine instance.
+func (a *Aggregator) Storage() *storage.Storage {
+	return a.storage
 }
 
 // LastProcessedWalID returns the highest WAL ID processed by the background worker.
@@ -231,12 +245,15 @@ func (a *Aggregator) Serve(ctx context.Context) error {
 	}
 }
 
-// Close gracefully stops the server if running.
+// Close gracefully stops the server if running and closes the storage engine.
 func (a *Aggregator) Close() {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	if a.grpcServer != nil {
 		a.grpcServer.GracefulStop()
 		a.grpcServer = nil
+	}
+	if a.storage != nil {
+		_ = a.storage.Close()
 	}
 }

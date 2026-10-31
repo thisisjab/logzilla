@@ -334,6 +334,10 @@ end`,
 		return agg.LastProcessedWalID() == 5000
 	}, 3*time.Second, 50*time.Millisecond)
 
+	// Verify record reached MemTable
+	require.NotNil(t, agg.Storage())
+	assert.Equal(t, 1, agg.Storage().ActiveMemTable().Len())
+
 	// 4. Shutdown aggregator
 	cancel()
 	select {
