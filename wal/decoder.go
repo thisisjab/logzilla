@@ -22,7 +22,11 @@ const (
 	colLenSize    = 4
 	dataLenSize   = 4
 
-	minRecordHeaderSize = nodeIDSize + timestampSize + recordIDSize + colLenSize + dataLenSize // 48 bytes
+	// RecordHeaderSize is the fixed 48-byte overhead of a binary WAL record header:
+	// NodeID (16B) + Timestamp (8B) + ID (16B) + ColLen (4B) + DataLen (4B).
+	RecordHeaderSize = nodeIDSize + timestampSize + recordIDSize + colLenSize + dataLenSize
+
+	minRecordHeaderSize = RecordHeaderSize
 )
 
 // UnpackedRecord represents a decoded record from a WAL file.
