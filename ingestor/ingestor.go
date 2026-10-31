@@ -6,9 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"path/filepath"
-	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -167,7 +164,8 @@ func (ing *Ingestor) PollWAL(ctx context.Context, lastWalID int64) <-chan WALSeg
 		}
 
 		dir := ing.wal.Dir()
-		entries, err := os.ReadDir(dir)
+		activeFile := ing.wal.ActiveFileName()
+		allSegments, err := wal.ListSegments(dir, 0, activeFile)
 		if err != nil {
 			select {
 			case ch <- WALSegment{Err: fmt.Errorf("cannot read WAL directory: %w", err)}:
@@ -176,45 +174,14 @@ func (ing *Ingestor) PollWAL(ctx context.Context, lastWalID int64) <-chan WALSeg
 			return
 		}
 
-		activeFile := ing.wal.ActiveFileName()
-		type walCandidate struct {
-			id   int64
-			name string
+		var candidates []wal.Segment
+		for _, seg := range allSegments {
+			if lastWalID > 0 && seg.ID <= lastWalID {
+				_ = os.Remove(seg.Path)
+				continue
+			}
+			candidates = append(candidates, seg)
 		}
-		var candidates []walCandidate
-
-		for _, entry := range entries {
-			if entry.IsDir() {
-				continue
-			}
-			name := entry.Name()
-			if !strings.HasSuffix(name, ".wal") || name == activeFile {
-				continue
-			}
-
-			idStr := strings.TrimSuffix(name, ".wal")
-			id, err := strconv.ParseInt(idStr, 10, 64)
-			if err != nil {
-				ing.logger.Warn("skipping WAL file with invalid timestamp filename", "file", name, "error", err)
-				continue
-			}
-
-			if lastWalID > 0 && id <= lastWalID {
-				filePath := filepath.Join(dir, name)
-				if err := os.Remove(filePath); err != nil && !os.IsNotExist(err) {
-					ing.logger.Error("failed to remove acknowledged WAL file", "file", filePath, "error", err)
-				}
-				continue
-			}
-
-			if id > lastWalID {
-				candidates = append(candidates, walCandidate{id: id, name: name})
-			}
-		}
-
-		sort.Slice(candidates, func(i, j int) bool {
-			return candidates[i].id < candidates[j].id
-		})
 
 		for _, cand := range candidates {
 			select {
@@ -224,25 +191,24 @@ func (ing *Ingestor) PollWAL(ctx context.Context, lastWalID int64) <-chan WALSeg
 			}
 
 			// Re-check active file name in case rotation happened
-			if cand.name == ing.wal.ActiveFileName() {
+			if cand.Name == ing.wal.ActiveFileName() {
 				continue
 			}
 
-			filePath := filepath.Join(dir, cand.name)
-			data, err := os.ReadFile(filePath)
+			data, err := os.ReadFile(cand.Path)
 			if err != nil {
 				if os.IsNotExist(err) {
 					continue
 				}
 				select {
-				case ch <- WALSegment{Err: fmt.Errorf("failed to read WAL file %s: %w", cand.name, err)}:
+				case ch <- WALSegment{Err: fmt.Errorf("failed to read WAL file %s: %w", cand.Name, err)}:
 				case <-ctx.Done():
 				}
 				return
 			}
 
 			select {
-			case ch <- WALSegment{ID: cand.id, Data: data}:
+			case ch <- WALSegment{ID: cand.ID, Data: data}:
 			case <-ctx.Done():
 				return
 			}

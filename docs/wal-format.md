@@ -58,6 +58,9 @@ Every log record inside a `.wal` file consists of a fixed-size header followed b
 
 - **Minimum Record Header Size**: $16 + 8 + 16 + 4 + 4 = 48 \text{ bytes}$.
 
+### Encoding Records
+The `wal` package provides `wal.EncodeRecord(nodeID, timestamp, id, collector, data)` to serialize records according to the binary wire format. If `timestamp <= 0` or `id` is empty, current UTC millisecond timestamp and new ULID are generated automatically.
+
 ---
 
 ## 2. WAL File Lifecycle
@@ -72,6 +75,9 @@ WAL files are saved as `<UnixMilli>.wal` (e.g., `1728471234000.wal`). This guara
   1. `file.Sync()` flushes dirty OS buffers to disk.
   2. The current file is closed.
   3. A new file `<CurrentUnixMilli>.wal` is created with permissions `0644`.
+
+### Segment Discovery (`ListSegments`)
+The `wal` package provides `ListSegments(dir, afterID, excludeName)` for scanning closed segments across ingestor and aggregator services. It ignores active and temporary files and returns candidates sorted in ascending chronological order.
 
 ### Background Sync
 - A background ticker (`time.NewTicker(syncInterval)`) wakes up every `wal.sync_interval` (default: `100ms`).

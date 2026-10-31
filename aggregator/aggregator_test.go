@@ -2,7 +2,6 @@ package aggregator
 
 import (
 	"context"
-	"encoding/binary"
 	"fmt"
 	"io"
 	"log/slog"
@@ -30,25 +29,7 @@ import (
 )
 
 func createTestWALData(collectorName, rawData string) []byte {
-	nodeID := uuid.New()
-	timestamp := uint64(time.Now().UnixMilli())
-	logID := ulid.Make()
-
-	colLen := uint32(len(collectorName))
-	dataLen := uint32(len(rawData))
-
-	totalLen := 16 + 8 + 16 + 4 + int(colLen) + 4 + int(dataLen)
-	rec := make([]byte, totalLen)
-
-	copy(rec[0:16], nodeID[:])
-	binary.BigEndian.PutUint64(rec[16:24], timestamp)
-	copy(rec[24:40], logID[:])
-	binary.BigEndian.PutUint32(rec[40:44], colLen)
-	copy(rec[44:44+colLen], collectorName)
-	binary.BigEndian.PutUint32(rec[44+colLen:48+colLen], dataLen)
-	copy(rec[48+colLen:], rawData)
-
-	return rec
+	return wal.EncodeRecord(uuid.New(), 0, ulid.ULID{}, collectorName, rawData)
 }
 
 type spyProcessor struct {

@@ -12,6 +12,9 @@ import (
 
 // [UNIX Millisecond (8 Bytes)] [ULID (16 bytes)] [Collector Name Length (4 bytes)] [Collector Name] [Log Data Length (4 bytes)] [Log Data]
 
+// Extension is the standard file extension for closed and active WAL segments.
+const Extension = ".wal"
+
 // Record defines the binary wire format of each log entry inside the WAL:
 type Record []byte
 

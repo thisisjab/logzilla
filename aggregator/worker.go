@@ -4,19 +4,10 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
-	"sort"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/thisisjab/logzilla/wal"
 )
-
-type walCandidate struct {
-	id   int64
-	name string
-}
 
 // runWorker periodically scans for newly persisted WAL files and streams
 // their records through the processor router until ctx is canceled.
@@ -39,43 +30,11 @@ func (a *Aggregator) runWorker(ctx context.Context) {
 
 // processNewWALFiles scans walDir for closed segments with id > lastProcessedWalID.
 func (a *Aggregator) processNewWALFiles(ctx context.Context) {
-	entries, err := os.ReadDir(a.walDir)
+	candidates, err := wal.ListSegments(a.walDir, a.lastProcessedWalID.Load(), "")
 	if err != nil {
-		a.logger.Error("failed to read WAL dir in pipeline worker", "dir", a.walDir, "error", err)
+		a.logger.Error("failed to list WAL segments in pipeline worker", "dir", a.walDir, "error", err)
 		return
 	}
-
-	lastID := a.lastProcessedWalID.Load()
-
-	var candidates []walCandidate
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		name := entry.Name()
-
-		// Ignore .tmp files as they represent in-flight uncommitted writes
-		if !strings.HasSuffix(name, ".wal") {
-			continue
-		}
-
-		idStr := strings.TrimSuffix(name, ".wal")
-		id, err := strconv.ParseInt(idStr, 10, 64)
-		if err != nil {
-			a.logger.Warn("skipping WAL file with invalid timestamp filename", "file", name, "error", err)
-			continue
-		}
-
-		// Only process files newer than our last completed cursor
-		if id > lastID {
-			candidates = append(candidates, walCandidate{id: id, name: name})
-		}
-	}
-
-	// Process strictly in ascending timestamp order to preserve log chronology
-	sort.Slice(candidates, func(i, j int) bool {
-		return candidates[i].id < candidates[j].id
-	})
 
 	for _, cand := range candidates {
 		select {
@@ -84,13 +43,12 @@ func (a *Aggregator) processNewWALFiles(ctx context.Context) {
 		default:
 		}
 
-		filePath := filepath.Join(a.walDir, cand.name)
-		if err := a.processWALFile(filePath, cand.id); err != nil {
-			a.logger.Error("failed to process WAL file in pipeline", "file", cand.name, "wal_id", cand.id, "error", err)
+		if err := a.processWALFile(cand.Path, cand.ID); err != nil {
+			a.logger.Error("failed to process WAL file in pipeline", "file", cand.Name, "wal_id", cand.ID, "error", err)
 			return
 		}
 
-		a.lastProcessedWalID.Store(cand.id)
+		a.lastProcessedWalID.Store(cand.ID)
 	}
 }
 

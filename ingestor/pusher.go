@@ -6,9 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"path/filepath"
-	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -113,11 +110,6 @@ func (p *Pusher) Run(ctx context.Context) {
 	}
 }
 
-type walCandidate struct {
-	id   int64
-	name string
-}
-
 // PushCycle scans for closed WAL files and attempts to send each one in Best-Effort mode.
 func (p *Pusher) PushCycle(ctx context.Context) {
 	p.mu.Lock()
@@ -129,37 +121,12 @@ func (p *Pusher) PushCycle(ctx context.Context) {
 	}
 
 	dir := p.wal.Dir()
-	entries, err := os.ReadDir(dir)
+	activeFile := p.wal.ActiveFileName()
+	candidates, err := wal.ListSegments(dir, 0, activeFile)
 	if err != nil {
 		p.logger.Error("failed to read WAL dir in pusher", "dir", dir, "error", err)
 		return
 	}
-
-	activeFile := p.wal.ActiveFileName()
-	var candidates []walCandidate
-
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		name := entry.Name()
-		if !strings.HasSuffix(name, ".wal") || name == activeFile {
-			continue
-		}
-
-		idStr := strings.TrimSuffix(name, ".wal")
-		id, err := strconv.ParseInt(idStr, 10, 64)
-		if err != nil {
-			p.logger.Warn("skipping WAL file with invalid timestamp filename in pusher", "file", name, "error", err)
-			continue
-		}
-
-		candidates = append(candidates, walCandidate{id: id, name: name})
-	}
-
-	sort.Slice(candidates, func(i, j int) bool {
-		return candidates[i].id < candidates[j].id
-	})
 
 	for _, cand := range candidates {
 		select {
@@ -168,13 +135,12 @@ func (p *Pusher) PushCycle(ctx context.Context) {
 		default:
 		}
 
-		// Double-check active file name
-		if cand.name == p.wal.ActiveFileName() {
+		// Double-check active file name in case rotation happened
+		if cand.Name == p.wal.ActiveFileName() {
 			continue
 		}
 
-		filePath := filepath.Join(dir, cand.name)
-		p.sendSegmentWithRetry(ctx, filePath, cand.id)
+		p.sendSegmentWithRetry(ctx, cand.Path, cand.ID)
 	}
 }
 
