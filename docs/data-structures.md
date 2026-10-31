@@ -1,74 +1,55 @@
-# Data Structures: Concurrent SkipList (MemTable Engine)
+# Data Structures: MemTable and SkipList Engine
 
-Logzilla includes a concurrent, in-memory **SkipList** implementation (`dsa/skiplist/skiplist.go`) designed to serve as the core indexing and sorting engine for the MemTable.
+Logzilla includes an in-memory **MemTable** backed by a private, generic **SkipList** implementation (`storage/skiplist.go`) designed to serve as the core indexing and sorting engine for ingestion and flushing.
 
 ---
 
-## 1. Why a SkipList?
+## 1. Why a SkipList for MemTable?
 
 A SkipList is a probabilistic alternative to balanced search trees (such as Red-Black Trees or AVL Trees). It provides:
-- **$O(\log N)$** expected time complexity for `Search`, `Insert`, and `Delete`.
-- **Lock-free / Low-contention concurrency potential**: Linked-list layers allow fine-grained concurrency or read-write locks without expensive tree-rebalancing operations.
-- **Natural Range Scans**: Lowest-level nodes form a sorted singly-linked list, ideal for sequentially iterating log records over a time interval.
+- **$O(\log N)$** expected time complexity for `Search`, `Add`, and `Remove`.
+- **Low-Contention Concurrency**: Read/Write operations can be synchronized cleanly with mutexes without tree rebalancing overheads.
+- **Natural Range Scans via Level 0 Iterator**: Lowest-level nodes form a sorted singly-linked list, ideal for sequentially iterating log records when flushing to disk (SSTables) or querying time ranges.
 
 ---
 
 ## 2. Architecture & Probabilistic Towering
 
 ```
-Level 3:  [Head] ------------------------------> [Key: 50] ------------------------------> NIL
+Level 3:  [Head] ------------------------------> [Record C] ------------------------------> NIL
             |                                       |
-Level 2:  [Head] --------------> [Key: 25] ------> [Key: 50] --------------> [Key: 80] --> NIL
+Level 2:  [Head] --------------> [Record B] ------> [Record C] --------------> [Record E] --> NIL
             |                       |               |                       |
-Level 1:  [Head] --> [Key: 10] -> [Key: 25] ------> [Key: 50] -> [Key: 60] -> [Key: 80] --> NIL
+Level 1:  [Head] --> [Record A] -> [Record B] ------> [Record C] -> [Record D] -> [Record E] --> NIL
             |           |           |               |           |           |
-Level 0:  [Head] -> 10 -> 15 -> 20 -> 25 -> 30 -> 40 -> 50 -> 55 -> 60 -> 70 -> 80 -> 90 -> NIL
+Level 0:  [Head] -> Rec A -> Rec B -> Rec C -> Rec D -> Rec E -> Rec F -> Rec G -> NIL
 ```
 
 ### Configurable Parameters
-- `MaxLevel`: Default `16` (supports millions of items with optimal height).
-- `Probability (P)`: Default `0.5` (each node has a 50% chance of ascending to the next higher layer).
-
-```go
-type SkipList struct {
-    head     *Node
-    maxLevel int
-    level    int
-    p        float64
-    size     int
-    mu       sync.RWMutex
-}
-```
+- `maxLevels`: `16` (supports up to $2^{16}$ elements with optimal height).
+- `Probability (P)`: `0.5` (each node has a 50% chance of ascending to the next higher layer).
 
 ---
 
-## 3. Core API
+## 3. Storage Layer Architecture
+
+The `storage` package manages the lifecycle of in-memory log ingestion:
 
 ```go
-// New creates a new SkipList instance with custom max level and probability.
-func New(maxLevel int, p float64) *SkipList
+// DefaultMaxMemTableBytes is 64MB.
+const DefaultMaxMemTableBytes int64 = 64 * 1024 * 1024
 
-// Insert stores a key-value pair. If key already exists, updates value.
-func (sl *SkipList) Insert(key string, value any)
+// MemTable encapsulates a skipList[entity.LogRecord] sorted by Timestamp, then ULID.
+type MemTable struct { ... }
 
-// Search retrieves value for a key in O(log N) time.
-func (sl *SkipList) Search(key string) (any, bool)
-
-// Delete removes a key and returns true if deleted.
-func (sl *SkipList) Delete(key string) bool
-
-// Size returns total count of elements in O(1) time.
-func (sl *SkipList) Size() int
+// Storage coordinates active and immutable MemTables, swap handoffs, and write stalls.
+type Storage struct { ... }
 ```
 
----
+### Ordering Guarantee
+`MemTable` orders incoming `entity.LogRecord` instances chronologically:
+1. `Timestamp` ascending (millisecond Unix timestamp).
+2. `ID.Compare(other.ID)` as the deterministic tie-breaker.
 
-## 4. Role in Logzilla MemTable
-
-During Phase 3, incoming unpacked and pre-processed `LogRecord` instances are inserted into the SkipList using a composite key:
-`key := fmt.Sprintf("%020d_%s", record.Timestamp, record.ID.String())`
-
-This guarantees:
-1. All records in memory are automatically sorted chronologically.
-2. Ties in timestamps are broken deterministically by ULID.
-3. Fast range scanning during queries and SSTable disk flushes.
+### Memory Accounting
+Threshold capacity calculation uses `wal.RecordHeaderSize` (48 bytes wire header) plus lengths of variable fields (`CollectorName`, `Raw`, `Message`). When threshold is reached, `Storage` performs a MemTable swap. If an immutable MemTable is currently flushing, write stall backpressure is applied via condition variable until the flush completes.

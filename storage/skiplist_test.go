@@ -1,8 +1,9 @@
-package skiplist
+package storage
 
 import (
 	"cmp"
 	"math/rand/v2"
+	"slices"
 	"strconv"
 	"testing"
 
@@ -10,9 +11,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestNew(t *testing.T) {
+func TestNewSkipList(t *testing.T) {
 	t.Run("initializes empty skip list", func(t *testing.T) {
-		sl := New[int](cmp.Compare[int])
+		sl := newSkipList[int](cmp.Compare[int])
 
 		require.NotNil(t, sl)
 		assert.Equal(t, 0, sl.Len())
@@ -24,7 +25,7 @@ func TestNew(t *testing.T) {
 
 func TestSkipList_Search(t *testing.T) {
 	t.Run("returns false and zero value on empty list", func(t *testing.T) {
-		sl := New[int](cmp.Compare[int])
+		sl := newSkipList[int](cmp.Compare[int])
 
 		val, found := sl.Search(42)
 
@@ -33,7 +34,7 @@ func TestSkipList_Search(t *testing.T) {
 	})
 
 	t.Run("returns true and value when item exists", func(t *testing.T) {
-		sl := New[int](cmp.Compare[int])
+		sl := newSkipList[int](cmp.Compare[int])
 		sl.Add(10)
 		sl.Add(20)
 		sl.Add(30)
@@ -45,7 +46,7 @@ func TestSkipList_Search(t *testing.T) {
 	})
 
 	t.Run("returns false when searching for non-existent items", func(t *testing.T) {
-		sl := New[int](cmp.Compare[int])
+		sl := newSkipList[int](cmp.Compare[int])
 		sl.Add(10)
 		sl.Add(20)
 		sl.Add(30)
@@ -61,7 +62,7 @@ func TestSkipList_Search(t *testing.T) {
 
 func TestSkipList_Add(t *testing.T) {
 	t.Run("inserts single item and updates len", func(t *testing.T) {
-		sl := New[int](cmp.Compare[int])
+		sl := newSkipList[int](cmp.Compare[int])
 
 		sl.Add(10)
 
@@ -72,7 +73,7 @@ func TestSkipList_Add(t *testing.T) {
 	})
 
 	t.Run("ignores duplicate values without increasing len", func(t *testing.T) {
-		sl := New[int](cmp.Compare[int])
+		sl := newSkipList[int](cmp.Compare[int])
 
 		sl.Add(10)
 		sl.Add(20)
@@ -85,7 +86,7 @@ func TestSkipList_Add(t *testing.T) {
 	})
 
 	t.Run("inserts elements in descending order correctly", func(t *testing.T) {
-		sl := New[int](cmp.Compare[int])
+		sl := newSkipList[int](cmp.Compare[int])
 
 		for i := 50; i >= 10; i -= 10 {
 			sl.Add(i)
@@ -100,7 +101,7 @@ func TestSkipList_Add(t *testing.T) {
 	})
 
 	t.Run("maintains sorted order on level 0", func(t *testing.T) {
-		sl := New[int](cmp.Compare[int])
+		sl := newSkipList[int](cmp.Compare[int])
 		values := []int{30, 10, 50, 20, 40}
 
 		for _, v := range values {
@@ -122,7 +123,7 @@ func TestSkipList_Add(t *testing.T) {
 
 func TestSkipList_Remove(t *testing.T) {
 	t.Run("returns false when removing from empty list", func(t *testing.T) {
-		sl := New[int](cmp.Compare[int])
+		sl := newSkipList[int](cmp.Compare[int])
 
 		removed := sl.Remove(10)
 
@@ -131,7 +132,7 @@ func TestSkipList_Remove(t *testing.T) {
 	})
 
 	t.Run("returns false when removing non-existent element", func(t *testing.T) {
-		sl := New[int](cmp.Compare[int])
+		sl := newSkipList[int](cmp.Compare[int])
 		sl.Add(10)
 		sl.Add(30)
 
@@ -142,7 +143,7 @@ func TestSkipList_Remove(t *testing.T) {
 	})
 
 	t.Run("removes single existing element", func(t *testing.T) {
-		sl := New[int](cmp.Compare[int])
+		sl := newSkipList[int](cmp.Compare[int])
 		sl.Add(10)
 
 		removed := sl.Remove(10)
@@ -155,7 +156,7 @@ func TestSkipList_Remove(t *testing.T) {
 	})
 
 	t.Run("removes first element in multi-element list", func(t *testing.T) {
-		sl := New[int](cmp.Compare[int])
+		sl := newSkipList[int](cmp.Compare[int])
 		sl.Add(10)
 		sl.Add(20)
 		sl.Add(30)
@@ -174,7 +175,7 @@ func TestSkipList_Remove(t *testing.T) {
 	})
 
 	t.Run("removes middle element in multi-element list", func(t *testing.T) {
-		sl := New[int](cmp.Compare[int])
+		sl := newSkipList[int](cmp.Compare[int])
 		sl.Add(10)
 		sl.Add(20)
 		sl.Add(30)
@@ -193,7 +194,7 @@ func TestSkipList_Remove(t *testing.T) {
 	})
 
 	t.Run("removes last element in multi-element list", func(t *testing.T) {
-		sl := New[int](cmp.Compare[int])
+		sl := newSkipList[int](cmp.Compare[int])
 		sl.Add(10)
 		sl.Add(20)
 		sl.Add(30)
@@ -212,7 +213,7 @@ func TestSkipList_Remove(t *testing.T) {
 	})
 
 	t.Run("removes all elements sequentially", func(t *testing.T) {
-		sl := New[int](cmp.Compare[int])
+		sl := newSkipList[int](cmp.Compare[int])
 		nums := []int{10, 20, 30, 40, 50}
 
 		for _, n := range nums {
@@ -231,7 +232,7 @@ func TestSkipList_Remove(t *testing.T) {
 	})
 
 	t.Run("handles re-inserting removed elements", func(t *testing.T) {
-		sl := New[int](cmp.Compare[int])
+		sl := newSkipList[int](cmp.Compare[int])
 		sl.Add(10)
 		sl.Add(20)
 
@@ -247,7 +248,7 @@ func TestSkipList_Remove(t *testing.T) {
 }
 
 func TestSkipList_Level0_And_LenIntegrity(t *testing.T) {
-	countLevel0 := func(sl *SkipList[int]) (int, []int) {
+	countLevel0 := func(sl *skipList[int]) (int, []int) {
 		var collected []int
 		curr := sl.head.next[0]
 		for curr != nil {
@@ -258,7 +259,7 @@ func TestSkipList_Level0_And_LenIntegrity(t *testing.T) {
 	}
 
 	t.Run("empty skip list has zero level 0 nodes and zero len", func(t *testing.T) {
-		sl := New[int](cmp.Compare[int])
+		sl := newSkipList[int](cmp.Compare[int])
 		count, nodes := countLevel0(sl)
 
 		assert.Equal(t, 0, sl.Len())
@@ -268,7 +269,7 @@ func TestSkipList_Level0_And_LenIntegrity(t *testing.T) {
 	})
 
 	t.Run("level 0 node count exactly matches len across mutations", func(t *testing.T) {
-		sl := New[int](cmp.Compare[int])
+		sl := newSkipList[int](cmp.Compare[int])
 		nums := []int{45, 12, 89, 33, 7, 56, 21, 99, 64, 33, 12}
 
 		for _, n := range nums {
@@ -307,7 +308,7 @@ func TestSkipList_Level0_And_LenIntegrity(t *testing.T) {
 
 func TestSkipList_Generics(t *testing.T) {
 	t.Run("supports string values", func(t *testing.T) {
-		sl := New[string](cmp.Compare[string])
+		sl := newSkipList[string](cmp.Compare[string])
 
 		words := []string{"banana", "apple", "cherry", "date"}
 		for _, w := range words {
@@ -340,7 +341,7 @@ func TestSkipList_Generics(t *testing.T) {
 			return cmp.Compare(a.id, b.id)
 		}
 
-		sl := New(compareUser)
+		sl := newSkipList(compareUser)
 		sl.Add(userRecord{id: 3, name: "Charlie"})
 		sl.Add(userRecord{id: 1, name: "Alice"})
 		sl.Add(userRecord{id: 2, name: "Bob"})
@@ -364,7 +365,7 @@ func TestSkipList_Generics(t *testing.T) {
 
 func TestSkipList_LargeScale(t *testing.T) {
 	t.Run("handles large number of random insertions, lookups, and removals", func(t *testing.T) {
-		sl := New[int](cmp.Compare[int])
+		sl := newSkipList[int](cmp.Compare[int])
 		const count = 1000
 
 		nums := make([]int, count)
@@ -423,9 +424,38 @@ func TestRandomLevel(t *testing.T) {
 	})
 }
 
+func TestSkipList_Iterator(t *testing.T) {
+	t.Run("iterates empty list", func(t *testing.T) {
+		sl := newSkipList[int](cmp.Compare[int])
+		it := sl.Iterator()
+		require.NotNil(t, it)
+		assert.False(t, it.Next())
+		assert.Equal(t, 0, it.Value())
+	})
+
+	t.Run("iterates elements in ascending sorted order", func(t *testing.T) {
+		sl := newSkipList[int](cmp.Compare[int])
+		items := []int{50, 10, 30, 20, 40}
+		for _, item := range items {
+			sl.Add(item)
+		}
+
+		it := sl.Iterator()
+		var collected []int
+		for it.Next() {
+			collected = append(collected, it.Value())
+		}
+
+		expected := []int{10, 20, 30, 40, 50}
+		assert.Equal(t, expected, collected)
+		assert.True(t, slices.IsSorted(collected))
+		assert.False(t, it.Next())
+	})
+}
+
 func BenchmarkSkipList(b *testing.B) {
 	b.Run("Add", func(b *testing.B) {
-		sl := New[int](cmp.Compare[int])
+		sl := newSkipList[int](cmp.Compare[int])
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			sl.Add(i)
@@ -433,7 +463,7 @@ func BenchmarkSkipList(b *testing.B) {
 	})
 
 	b.Run("Search", func(b *testing.B) {
-		sl := New[string](cmp.Compare[string])
+		sl := newSkipList[string](cmp.Compare[string])
 		for i := 0; i < 1000; i++ {
 			sl.Add(strconv.Itoa(i))
 		}
@@ -445,7 +475,7 @@ func BenchmarkSkipList(b *testing.B) {
 
 	b.Run("Remove", func(b *testing.B) {
 		b.StopTimer()
-		sl := New[int](cmp.Compare[int])
+		sl := newSkipList[int](cmp.Compare[int])
 		for i := 0; i < b.N; i++ {
 			sl.Add(i)
 		}

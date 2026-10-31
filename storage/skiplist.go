@@ -1,4 +1,4 @@
-package skiplist
+package storage
 
 import "math/rand/v2"
 
@@ -19,19 +19,17 @@ func newNode[T any](value T, level int) *node[T] {
 	}
 }
 
-// SkipList represents a probabilistic alternative to balanced trees,
-// maintaining elements in sorted order with O(log n) average search and insertion time.
-type SkipList[T any] struct {
+// skipList maintains elements in sorted order with O(log n) average search and insertion time.
+type skipList[T any] struct {
 	len     int
 	level   int
 	head    *node[T]
 	compare func(a, b T) int
 }
 
-// New creates and initializes an empty SkipList with the given comparison function.
-// The compare function should return a negative number if a < b, 0 if a == b, and a positive number if a > b.
-func New[T any](compare func(a, b T) int) *SkipList[T] {
-	return &SkipList[T]{
+// newSkipList creates and initializes an empty skip list with the given comparison function.
+func newSkipList[T any](compare func(a, b T) int) *skipList[T] {
+	return &skipList[T]{
 		compare: compare,
 		level:   1,
 		head:    newNode(*new(T), maxLevels),
@@ -39,13 +37,12 @@ func New[T any](compare func(a, b T) int) *SkipList[T] {
 }
 
 // Len returns the number of elements in the skip list.
-func (s *SkipList[T]) Len() int {
+func (s *skipList[T]) Len() int {
 	return s.len
 }
 
 // Search looks for value v in the skip list.
-// Returns the matched element and true if found, or the zero value of T and false otherwise.
-func (s *SkipList[T]) Search(v T) (T, bool) {
+func (s *skipList[T]) Search(v T) (T, bool) {
 	current := s.head
 
 	for i := s.level - 1; i >= 0; i-- {
@@ -63,7 +60,7 @@ func (s *SkipList[T]) Search(v T) (T, bool) {
 
 // Add inserts a new value v into the skip list.
 // If the value already exists according to compare func, the operation is a no-op.
-func (s *SkipList[T]) Add(v T) {
+func (s *skipList[T]) Add(v T) {
 	update := make([]*node[T], maxLevels)
 	current := s.head
 
@@ -98,7 +95,7 @@ func (s *SkipList[T]) Add(v T) {
 }
 
 // Remove deletes the value from the skip list if present and returns true, or false if not found.
-func (s *SkipList[T]) Remove(value T) bool {
+func (s *skipList[T]) Remove(value T) bool {
 	current := s.head
 	update := make([]*node[T], maxLevels)
 
@@ -130,7 +127,36 @@ func (s *SkipList[T]) Remove(value T) bool {
 	return true
 }
 
-// randomLevel generates a random height for a new node using a geometric distribution (p=0.5).
+// Iterator returns a sequential forward iterator traversing Level 0 from smallest to largest element.
+func (s *skipList[T]) Iterator() *skipListIterator[T] {
+	return &skipListIterator[T]{
+		curr: s.head,
+	}
+}
+
+// skipListIterator provides forward sequential traversal over Level 0 of a skipList.
+type skipListIterator[T any] struct {
+	curr *node[T]
+}
+
+// Next advances the iterator to the next element. Returns false when iteration is complete.
+func (it *skipListIterator[T]) Next() bool {
+	if it.curr == nil || it.curr.next[0] == nil {
+		it.curr = nil
+		return false
+	}
+	it.curr = it.curr.next[0]
+	return true
+}
+
+// Value returns the current element value.
+func (it *skipListIterator[T]) Value() T {
+	if it.curr == nil {
+		return *new(T)
+	}
+	return it.curr.value
+}
+
 func randomLevel() int {
 	l := 1
 	for l < maxLevels && rand.Int()%2 == 0 {
