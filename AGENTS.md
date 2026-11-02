@@ -21,7 +21,8 @@ Applies to anything architectural: a new package, component, exported interface,
 
 ## Scope
 
-- Don't write code you weren't told to write. No extra features, refactors, or cleanups. Mention them briefly and wait.
+- Don't write code you weren't told to write. No extra features, refactors, or cleanups. Never overstep. Mention them briefly and wait.
+- Questions (e.g., "can we refactor?") are never approval. I must approve explicitly before you write code.
 - Exception: tests and docs for the code you write are always in scope.
 - When unsure, ask instead of guessing.
 
@@ -56,4 +57,4 @@ Applies to anything architectural: a new package, component, exported interface,
 
 - Conventional Commits: `type(scope): description`. Mark breaking changes with `!`.
 - Small, focused commits.
-- Never commit or push unless I tell you to.
+- Never push. Never commit unless I tell you to.
