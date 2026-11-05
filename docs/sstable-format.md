@@ -3,7 +3,7 @@
 Final design decisions for the on-disk SSTable used by LogZilla's LSM storage.
 
 - All integers are **big-endian** (same as the WAL).
-- Files are **immutable** once written. Name: `<id>.sst`, where `<id>` is a monotonic number.
+- Files are **immutable** once written. Name: `<ulid>.sst`, where `<ulid>` is a monotonically generated ULID string.
 - Sizes below are in bytes.
 
 ---
@@ -76,6 +76,7 @@ Each record is self-delimiting, so a file can be scanned from offset 0 to `index
 │ node_name   u16 len | bytes                    │
 │ message     u32 len | bytes                    │
 │ metadata    u16 n | n x (u16 klen | key |      │
+│                          u8 type |             │
 │                          u32 vlen | value)     │
 │ raw         u32 len | bytes                    │
 ├────────────────────────────────────────────────┤
@@ -85,7 +86,14 @@ Each record is self-delimiting, so a file can be scanned from offset 0 to `index
 ```
 
 - The ULID is always stored, even if it is not an index field. Compaction needs it for total ordering and for dropping duplicates.
-- The shape of `metadata` can change without affecting the rest of the format.
+- **Metadata encoding:**
+  - Keys are sorted lexicographically before writing to guarantee deterministic serialization and CRC calculation.
+  - Nested keys are disallowed in v1.
+  - `type` byte values:
+    - `0x01`: `string` (UTF-8 bytes)
+    - `0x02`: `bool` (1 byte: `0x00` for false, `0x01` for true)
+    - `0x03`: `int64` (8 bytes, big-endian)
+    - `0x04`: `float64` (8 bytes, IEEE 754 big-endian)
 
 ---
 
@@ -231,7 +239,7 @@ The footer is always the **last 1024 bytes** of the file.
 ## 7. Write path (memtable flush or compaction)
 
 ```
- sorted records ──► <id>.sst.tmp
+ sorted records ──► <ulid>.sst.tmp
                        │
                        ├─ append each record, track min_ts / max_ts / count
                        ├─ build index entries in memory
@@ -242,7 +250,7 @@ The footer is always the **last 1024 bytes** of the file.
                     fsync file
                        │
                        ▼
-                    rename to <id>.sst
+                    rename to <ulid>.sst
                        │
                        ▼
                     fsync directory
